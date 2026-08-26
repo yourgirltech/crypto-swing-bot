@@ -39,7 +39,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from config.config import BACKTEST, MARKET, RISK
 from data.okx_client import OKXClient
@@ -104,7 +104,7 @@ def _get_reference_stats(symbol: str, strategy) -> tuple:
     type" instead of always coming back empty.
     """
     cached = _reference_stats_cache.get(symbol)
-    if cached is not None and datetime.utcnow() - cached[2] < REFERENCE_BACKTEST_REFRESH:
+    if cached is not None and datetime.now(timezone.utc) - cached[2] < REFERENCE_BACKTEST_REFRESH:
         return cached[0], cached[1]
 
     print(f"[{symbol}] Refreshing reference backtest ({BACKTEST.history_days} days) for backtested-stats context...")
@@ -112,7 +112,7 @@ def _get_reference_stats(symbol: str, strategy) -> tuple:
     df = client.get_historical_klines(symbol, MARKET.primary_timeframe, days=BACKTEST.history_days)
     bt = run_backtest(df, strategy, RISK, symbol, starting_balance=BACKTEST.starting_balance)
     summary, regime_breakdown = bt.summary(), bt.by_regime()
-    _reference_stats_cache[symbol] = (summary, regime_breakdown, datetime.utcnow())
+    _reference_stats_cache[symbol] = (summary, regime_breakdown, datetime.now(timezone.utc))
     return summary, regime_breakdown
 
 

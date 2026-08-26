@@ -35,6 +35,21 @@ the bot never trades unattended in early phases.
   pairs again once the system proves itself further.
 - **Exchange**: Bybit (spot first; futures/perps only once strategy is
   validated and only with capped low leverage).
+- **Network access from this dev machine**: Bybit's public API returns
+  HTTP 403 (CloudFront geo-block) and Binance returns HTTP 451 from this
+  machine/network — neither is reachable directly, which is why
+  `data/okx_client.py` exists as a same-interface drop-in substitute for
+  BACKTESTING purposes only (Bybit remains the documented execution
+  exchange; see `main.py`'s module docstring). **Update, 2026-08-26: OKX
+  itself also became unreachable from this network** (`www.okx.com` failed
+  DNS resolution — `getaddrinfo failed` — while unrelated hosts like
+  `google.com` resolved fine, confirming it's an OKX-specific block, not a
+  general outage) — the same ISP-level blocking pattern as Bybit/Binance,
+  just arriving later. **A VPN is now required to run this project at all
+  from this network** (confirmed: enabling one made `www.okx.com` resolve
+  correctly again). If a future session sees `ConnectionError`/DNS
+  failures on OKX calls, check the VPN before re-diagnosing this as a new
+  problem — it almost certainly isn't one.
 
 ## Strategy refinement: weak_bull_trend EMA21 confirmation filter
 
