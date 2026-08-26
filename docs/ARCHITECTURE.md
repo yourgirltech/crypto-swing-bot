@@ -671,14 +671,19 @@ regimes only (`strong_bull_trend`/`weak_bull_trend`/`strong_bear_trend`).
 **Result: NOT VALIDATED.** Full period (38 trades): 31.6% win rate,
 expectancy **-0.053R** — already net negative before any held-out split.
 In-sample alone (31 trades): -0.032R. Held-out (most recent 365 days, 7
-trades): -0.143R. Unlike Breakout's sign-flip, Pullback is consistently
-negative across all three slices — arguably a clearer signal than
-Breakout's, since it isn't just a most-recent-year phenomenon. 32 of 38
-trades landed in `weak_bull_trend` (-0.062R, the dominant bucket); the
-other two regime buckets have only 3 trades each, too few to read
-anything into individually. Held-out sample (7 trades) is below this
-project's own reliability bar, but its direction agrees with the larger
-in-sample slice, so this isn't just small-sample noise.
+trades): -0.143R. This is a DIFFERENT failure shape than Breakout's:
+Breakout had a real in-sample edge that didn't generalize forward
+(overfitting); Pullback never had an edge in-sample OR held-out, pointing
+at the entry logic itself lacking edge here rather than a generalization
+failure. 32 of 38 trades landed in `weak_bull_trend` (-0.062R, the
+dominant bucket); the other two regime buckets have only 3 trades each,
+too few to read anything into individually. Held-out sample (7 trades) is
+below this project's own reliability bar, but its direction agrees with
+the larger in-sample slice, so this isn't just small-sample noise.
+**Confidence caveat**: the full-period sample itself is small (38 trades
+total vs. Breakout's 126) — the directional consistency across slices is
+meaningful, but treat "lacks edge" as a reasonable working conclusion
+from limited evidence, not a statistically strong one.
 
 Kept in the codebase (not deleted), not registered in
 `strategies/registry.py` or exposed on the frontend — see
