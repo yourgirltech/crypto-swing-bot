@@ -67,6 +67,18 @@ def _to_okx_symbol(symbol: str) -> str:
     return symbol
 
 
+def _to_okx_perp_symbol(symbol: str) -> str:
+    """
+    BTCUSDT -> BTC-USDT-SWAP -- the perpetual swap instId, distinct from
+    the spot instId get_klines uses. Funding rate / open interest /
+    long-short ratio are perpetual-swap-specific concepts that don't
+    exist for the spot instrument this project actually trades (see
+    Milestone 9 -- these are collected as passive CONTEXT data alongside
+    spot trades, not traded themselves).
+    """
+    return f"{_to_okx_symbol(symbol)}-SWAP"
+
+
 class OKXClient:
     """Same interface/return shape as BybitClient, backed by OKX's public API."""
 
@@ -164,3 +176,58 @@ class OKXClient:
         result = pd.concat(all_frames, ignore_index=True)
         result = result.drop_duplicates(subset="open_time").sort_values("open_time").reset_index(drop=True)
         return result
+
+    # -- Milestone 9 (deferred as a live feature -- see docs/ARCHITECTURE.md).
+    # These three back paper_trading/engine.py's passive derivatives-
+    # collection step ONLY -- nothing else in this codebase calls them.
+    # Deliberately no retry-with-backoff here (unlike get_klines): this is
+    # non-critical context data, not a fetch the core trading logic
+    # depends on, so a single failed attempt just means one poll cycle's
+    # snapshot is skipped (there's another one in 15 minutes) rather than
+    # adding latency to every cycle for a non-essential value. Each
+    # returns None on any failure -- the caller treats that as "skip this
+    # field," not an error to propagate.
+
+    def get_funding_rate(self, symbol: str) -> float | None:
+        """Current funding rate for symbol's perpetual swap."""
+        inst_id = _to_okx_perp_symbol(symbol)
+        try:
+            resp = requests.get(f"{self.base_url}/api/v5/public/funding-rate",
+                                 params={"instId": inst_id}, timeout=15)
+            resp.raise_for_status()
+            payload = resp.json()
+            if payload.get("code") != "0" or not payload.get("data"):
+                return None
+            return float(payload["data"][0]["fundingRate"])
+        except Exception:
+            return None
+
+    def get_open_interest(self, symbol: str) -> float | None:
+        """Current open interest (in the instrument's own coin unit, oiCcy) for symbol's perpetual swap."""
+        inst_id = _to_okx_perp_symbol(symbol)
+        try:
+            resp = requests.get(f"{self.base_url}/api/v5/public/open-interest",
+                                 params={"instType": "SWAP", "instId": inst_id}, timeout=15)
+            resp.raise_for_status()
+            payload = resp.json()
+            if payload.get("code") != "0" or not payload.get("data"):
+                return None
+            return float(payload["data"][0]["oiCcy"])
+        except Exception:
+            return None
+
+    def get_long_short_ratio(self, symbol: str) -> float | None:
+        """Current long/short account ratio for symbol's perpetual swap (>1 means more long accounts than short)."""
+        inst_id = _to_okx_perp_symbol(symbol)
+        try:
+            resp = requests.get(
+                f"{self.base_url}/api/v5/rubik/stat/contracts/long-short-account-ratio-contract",
+                params={"instId": inst_id, "period": "5m", "limit": 1}, timeout=15,
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+            if payload.get("code") != "0" or not payload.get("data"):
+                return None
+            return float(payload["data"][0][1])
+        except Exception:
+            return None
