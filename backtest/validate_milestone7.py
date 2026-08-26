@@ -122,6 +122,7 @@ def print_report(result: dict) -> None:
 STRATEGIES = {
     "breakout": lambda: __import__("strategies.breakout", fromlist=["Breakout"]).Breakout(),
     "pullback": lambda: __import__("strategies.pullback", fromlist=["Pullback"]).Pullback(),
+    "mean_reversion": lambda: __import__("strategies.mean_reversion", fromlist=["MeanReversion"]).MeanReversion(),
 }
 
 
