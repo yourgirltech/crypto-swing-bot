@@ -4,6 +4,7 @@ __pycache__/
 .env
 logs/*.csv
 logs/*.json
+logs/*.log
 .DS_Store
 
 # Node / Next.js frontend

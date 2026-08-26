@@ -30,6 +30,33 @@ def get_or_create_asset(session: Session, symbol: str, exchange: str, category: 
     return asset
 
 
+def get_candles(session: Session, asset: Asset, timeframe: str, source: str) -> pd.DataFrame:
+    """
+    Loads already-persisted candles back into the same DataFrame shape
+    OKXClient/BybitClient return (open_time, open, high, low, close,
+    volume, turnover), sorted ascending -- i.e. exactly what run_backtest()
+    and add_all_indicators() expect. Lets backtesting run entirely off
+    Postgres history already saved by a prior live/paper poll or main.py
+    run, without depending on the exchange being reachable right now (see
+    [[system_health_retry_heartbeat]]/okx_geoblock_workaround memory --
+    OKX access from this machine is intermittent).
+    """
+    rows = session.scalars(
+        select(Candle).where(
+            Candle.asset_id == asset.id,
+            Candle.timeframe == timeframe,
+            Candle.source == source,
+        ).order_by(Candle.open_time.asc())
+    ).all()
+    return pd.DataFrame([
+        {
+            "open_time": r.open_time, "open": r.open, "high": r.high,
+            "low": r.low, "close": r.close, "volume": r.volume, "turnover": r.turnover,
+        }
+        for r in rows
+    ])
+
+
 def save_candles(session: Session, asset: Asset, timeframe: str, source: str, df: pd.DataFrame) -> int:
     """
     Upsert candles for (asset, timeframe, source) — skips rows whose
