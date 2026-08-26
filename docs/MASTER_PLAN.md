@@ -185,12 +185,36 @@ the first strategy ever built.
   project's specific trend-continuation definition more than these four
   breakout/pullback/reversion/range definitions did), not a null result.
 
-**Milestone 8:** Market regime detection formalized as an ML
-classification task (features: trend slope, ATR ratio, drawdown/rally
-magnitude — already computed in Phase 1 — fed into a simple classifier
-instead of hardcoded thresholds).
-— Python: scikit-learn basics (train/test split, classification metrics).
-— Trading: avoiding overfitting a regime label to one historical period.
+**Milestone 8 (DEFERRED, 2026-08-26 — not done, not silently skipped):**
+Market regime detection formalized as an ML classification task
+(features: trend slope, ATR ratio, drawdown/rally magnitude — already
+computed in Phase 1 — fed into a simple classifier instead of hardcoded
+thresholds). **Checked against real evidence before writing any model
+code, per this project's no-black-box-without-cause standard: does
+Milestone 7's evidence show the rule-based classifier actually causing
+strategy failures a better classifier would fix?** Checked
+Mean-reversion (unambiguous — 100% of its trades are, by its own gate,
+in the one regime it targets, and it still failed twice), and the real
+held-out regime breakdowns for Breakout and Range trading (the two
+strategies with any full-period regime-related pattern at all). **None
+showed evidence that regime mislabeling caused a failure a better
+classifier would have prevented** — see docs/ARCHITECTURE.md's
+"Milestone 8 — DEFERRED" section for the full per-strategy breakdown.
+Building an ML classifier without that evidence would likely just
+re-derive similar thresholds with more parameters and less
+explainability — a regression against this project's own "every label
+traceable to the numbers behind it" principle, not progress. Deferred
+until there's an actual case for it. **The one legitimate future
+direction if revisited**: supervised training directly on raw features
+vs. REAL trade outcomes (realized R-multiples), not on "what would the
+existing rule-based function have said" — the latter can only ever match
+or underperform the rules it imitates and adds complexity without adding
+signal.
+— Python: scikit-learn basics (train/test split, classification metrics)
+— not yet needed, since the milestone itself is deferred.
+— Trading: avoiding overfitting a regime label to one historical period
+  — and, as it turned out, avoiding building a solution before confirming
+  there's a real problem it solves.
 
 **Milestone 9:** Derivatives data (funding rate, open interest,
 long/short skew) as contextual filters, not signals.
