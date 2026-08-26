@@ -174,7 +174,7 @@ class RangeTrading(Strategy):
             return setup.entry_price - atr_val * self.atr_stop_mult
         return setup.entry_price + atr_val * self.atr_stop_mult
 
-    def compute_take_profit(self, setup: EntrySetup, stop_price: float) -> float:
+    def compute_take_profit(self, setup: EntrySetup, stop_price: float, window: pd.DataFrame) -> float:
         risk_dist = abs(setup.entry_price - stop_price)
         if setup.direction == "long":
             return setup.entry_price + risk_dist * self.reward_risk
@@ -184,7 +184,7 @@ class RangeTrading(Strategy):
         risk_dist = abs(entry_price - stop_price)
         return risk_amount / risk_dist if risk_dist else 0.0
 
-    def check_exit(self, direction: str, stop_price: float, target_price: float,
+    def check_exit(self, direction: str, entry_price: float, stop_price: float, target_price: float,
                     bar: pd.Series) -> Optional[ExitResult]:
         if direction == "long":
             if bar["low"] <= stop_price:
