@@ -691,6 +691,38 @@ Kept in the codebase (not deleted), not registered in
 directions (a minimum ATR-scaled pullback depth instead of "any EMA
 touch," or multi-bar reclaim confirmation instead of a single-bar cross).
 
+**Mean-reversion** (`strategies/mean_reversion.py`) — close at or beyond
+a Bollinger Band extreme (2σ, 20-period) with RSI confirming the same
+extreme (< 30 for long, > 70 for short), hard-gated to the `sideways`
+regime only (every other regime rejected outright — fading a real trend
+because RSI/BB read "overbought" is exactly the wrong idea to trade).
+
+**Result: NOT VALIDATED.** Full period (132 trades): 29.5% win rate,
+expectancy **-0.114R** — the worst full-period number of the three
+strategies built so far. In-sample (103 trades): -0.068R. Held-out (most
+recent 365 days, 29 trades): **-0.276R** — worse than in-sample, same
+"no edge anywhere" pattern as Pullback rather than Breakout's
+overfit-then-fail-forward shape. Notably, this has the healthiest sample
+size of the three (132 full / 29 held-out, both comfortably above the
+n≥5 reliability bar), so this "no edge" conclusion can be held with MORE
+confidence than Pullback's, not less. The regime gate is doing exactly
+what it was built to do — 100% of trades land in `sideways`, so this
+isn't a mis-gated strategy firing in the wrong regime; the BB+RSI extreme
+entry condition itself doesn't show an edge even restricted to the
+regime it was designed for.
+
+Candidate revision direction: a fixed 2.0R target (shared across all four
+strategies for interface consistency) may be poorly suited to mean
+reversion specifically — a bounce back toward the band's midline is a
+smaller expected move than a full trend-following 2R extension, so many
+genuine bounces may reverse back through break-even before reaching a 2R
+target sized for a different kind of setup. Testing a tighter R:R or a
+literal `bb_mid` target would require extending
+`Strategy.compute_take_profit()`'s signature (it only receives
+entry/stop prices today, not live band values) — a real interface
+change, not attempted here. Kept in the codebase, not registered in
+`strategies/registry.py` or exposed on the frontend.
+
 ## Architecture philosophy
 Deterministic core, LLM synthesis layer (Option 3 from planning discussion),
 evolving toward a proper multi-agent system (Option 2 / LangGraph-style)
