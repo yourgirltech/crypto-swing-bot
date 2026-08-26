@@ -723,6 +723,32 @@ entry/stop prices today, not live band values) — a real interface
 change, not attempted here. Kept in the codebase, not registered in
 `strategies/registry.py` or exposed on the frontend.
 
+**Cross-cutting finding, not per-strategy trivia: all three "NOT
+VALIDATED" strategies above share the same fixed 2:1 reward:risk exit,
+inherited unchanged from `TrendContinuationBOS`.** That target was never
+independently chosen for Breakout/Pullback/Mean-reversion — it was tuned
+around trend-continuation behavior specifically (a BOS entry riding an
+established trend to a 2R extension) and simply reused for interface
+consistency across all four strategies. Mean-reversion's own diagnosis
+above flagged this directly: a reversion trade is a bet on a bounce back
+to the band's midline, a smaller expected move than a full trend
+extension, so a 2R target sized for trend-following may be causing
+genuine winning bounces to reverse back through break-even before ever
+reaching it.
+
+The same logic applies, with less certainty, to Breakout and Pullback:
+neither is a trend-continuation setup either (Breakout catches a
+range→trend transition before structure confirms it; Pullback catches a
+retracement, not a fresh extension), so their entries have not actually
+been tested against an exit shaped for what THEY are — only against one
+shaped for a different, fourth strategy. **This means Breakout and
+Pullback's "no real edge" conclusions may be partly an exit-logic
+mismatch, not purely an entry-logic failure** — as designed, all three
+have only been fairly compared against each other and against
+`TrendContinuationBOS`, not fairly tested on their own terms. See below
+for the scoping of what a per-strategy `compute_take_profit()` would take
+to give them that fair re-test.
+
 ## Architecture philosophy
 Deterministic core, LLM synthesis layer (Option 3 from planning discussion),
 evolving toward a proper multi-agent system (Option 2 / LangGraph-style)
