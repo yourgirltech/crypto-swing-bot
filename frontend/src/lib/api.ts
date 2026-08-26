@@ -16,7 +16,9 @@ import type {
   EquityPoint,
   JournalEntry,
   PerformanceStats,
+  RiskState,
   StrategyInfo,
+  SystemHealth,
 } from "./types";
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8010";
@@ -95,4 +97,12 @@ export function getCandles(params: {
 
 export function getCumulativeRCurve(runId: number): Promise<CumulativeRPoint[]> {
   return apiGet<CumulativeRPoint[]>(`/backtests/${runId}/cumulative-r`);
+}
+
+export function getRiskState(): Promise<RiskState> {
+  return apiGet<RiskState>("/risk/status");
+}
+
+export function getSystemHealth(): Promise<SystemHealth> {
+  return apiGet<SystemHealth>("/system/health");
 }

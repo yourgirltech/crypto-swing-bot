@@ -54,6 +54,7 @@ export interface JournalEntry {
   r_multiple_ideal: number | null;
   r_multiple_realistic: number | null;
   pnl_ngn: number | null;
+  approval_summary: string | null;
 }
 
 export interface PerformanceStats {
@@ -140,4 +141,42 @@ export interface AccountSummary {
   max_weekly_loss_pct: number;
   max_open_positions: number;
   max_drawdown_pct: number;
+}
+
+export interface CorrelatedGroupExposure {
+  symbols: string[];
+  notional: number;
+  exposure_pct: number;
+}
+
+export interface RiskState {
+  risk_per_trade_pct: number;
+  max_position_size_pct: number;
+  max_portfolio_exposure_pct: number;
+  max_correlated_exposure_pct: number;
+  max_daily_loss_pct: number;
+  max_weekly_loss_pct: number;
+  max_drawdown_pct: number;
+  max_open_positions: number;
+  max_leverage: number;
+  correlated_groups: string[][];
+
+  account_equity: number;
+  peak_equity: number;
+  drawdown_pct: number;
+  daily_pnl_pct: number;
+  weekly_pnl_pct: number;
+  open_positions_count: number;
+  portfolio_exposure_pct: number;
+  correlated_exposure: CorrelatedGroupExposure[];
+}
+
+export interface SystemHealth {
+  api_ok: boolean;
+  db_ok: boolean;
+  latest_candle_time: string | null;
+  latest_signal_time: string | null;
+  configured_poll_interval_seconds: number;
+  retry_events_tracked: boolean;
+  paper_engine_heartbeat_tracked: boolean;
 }

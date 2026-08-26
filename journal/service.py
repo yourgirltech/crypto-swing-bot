@@ -74,6 +74,13 @@ class JournalEntry:
     r_multiple_ideal: Optional[float] = None
     r_multiple_realistic: Optional[float] = None
     pnl_ngn: Optional[float] = None
+    # The exact plain-language full trade review shown at approval time
+    # (reporting.plain_language_summary.explain_full_trade_review) -- only
+    # ever generated/stored when a PaperTrade was actually created (Milestone
+    # 4), i.e. the risk engine AND a human both approved. None otherwise --
+    # never reconstructed after the fact, since the metrics it was built
+    # from (risk budget usage AT THAT TIME) weren't separately persisted.
+    approval_summary: Optional[str] = None
 
 
 def _to_entry(signal: Signal) -> JournalEntry:
@@ -117,6 +124,7 @@ def _to_entry(signal: Signal) -> JournalEntry:
         r_multiple_ideal=pt.r_multiple_ideal if pt else None,
         r_multiple_realistic=pt.r_multiple_realistic if pt else None,
         pnl_ngn=pt.pnl_ngn if pt else None,
+        approval_summary=pt.approval_summary if pt else None,
     )
 
 

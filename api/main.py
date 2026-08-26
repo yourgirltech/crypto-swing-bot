@@ -24,7 +24,9 @@ from api.routes.account import router as account_router
 from api.routes.backtests import router as backtests_router
 from api.routes.journal import router as journal_router
 from api.routes.market import router as market_router
+from api.routes.risk import router as risk_router
 from api.routes.strategies import router as strategies_router
+from api.routes.system import router as system_router
 
 app = FastAPI(
     title="Crypto Swing Bot API",
@@ -44,6 +46,8 @@ app.include_router(backtests_router)
 app.include_router(strategies_router)
 app.include_router(account_router)
 app.include_router(market_router)
+app.include_router(risk_router)
+app.include_router(system_router)
 
 
 @app.get("/health", tags=["health"])
