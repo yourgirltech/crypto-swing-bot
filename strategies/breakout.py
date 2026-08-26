@@ -43,37 +43,60 @@ breakouts are exactly the mechanism by which a regime like `sideways`
 transitions into a trending one; excluding sideways-regime entries here
 would exclude the strategy's own reason for existing.
 
-VALIDATION STATUS: NOT VALIDATED -- do not treat this as a live/trusted
-setup. Run via backtest/validate_milestone7.py (BTCUSDT, 5yr 4H persisted
-history, 2026-08-26):
+VALIDATION STATUS: ASSET-SPECIFIC -- NOT VALIDATED on BTCUSDT, VALIDATED
+on ETHUSDT. This is the same strategy code and the same fixed parameters
+(no per-asset tuning) tested against two different assets' persisted 5yr
+4H history via backtest/validate_milestone7.py --symbol=<X>.
 
+--- BTCUSDT (2026-08-26): NOT VALIDATED ---
 Full period: 126 trades, 40.5% win rate, expectancy +0.214R.
 In-sample (everything before the most recent 365 days): 99 trades, 43.4%
 win rate, expectancy +0.303R -- looks like a real edge on its own.
-
 Held-out (most recent 365 days, genuine out-of-sample, NOT used to design
 this strategy): 27 trades, win rate drops to 29.6%, expectancy flips to
--0.111R. This is not "the edge weakened" (like weak_bull_trend's filter,
-which stayed negative in the SAME direction both in-sample and held-out)
--- it's a full sign flip, meaning the full-period/in-sample positive
-number was substantially an artifact of the specific years backtested,
-not a property of the entry logic that generalizes forward. Regime
-breakdown shows the strategy's trades landing mostly in the `sideways`
-classification (62/126) at entry time, which tracks mechanically -- a
-fresh range breakout is often still classified `sideways` by the
-20-bar-EMA-slope regime classifier at the moment it fires, since the
-slope hasn't caught up yet.
+-0.111R. This is not "the edge weakened" -- it's a full sign flip, meaning
+the full-period/in-sample positive number was substantially an artifact
+of the specific years backtested, not a property of the entry logic that
+generalizes forward. Regime breakdown shows the strategy's trades landing
+mostly in the `sideways` classification (62/126) at entry time, which
+tracks mechanically -- a fresh range breakout is often still classified
+`sideways` by the 20-bar-EMA-slope regime classifier at the moment it
+fires, since the slope hasn't caught up yet.
 
-Held-out sample is small (27 trades) -- normal caveat that magnitude
-isn't precise -- but the sign flip itself, on a channel/ATR-expansion
-rule with no parameters chosen by looking at this data, is a real signal
-that this specific entry definition doesn't have a robust edge as-is, not
-noise. Kept in the codebase (not deleted) as a base to iterate on --
-candidate directions for a future revision: requiring TrendState.RANGE
-specifically (rather than allowing entries during an already-trending
-market, which may be catching momentum exhaustion instead of a genuine
-consolidation break), or gating out the `strong_bear_trend` regime
-(5 trades, -0.400R, the worst full-period bucket).
+--- ETHUSDT (2026-08-26): VALIDATED ---
+Full period: 126 trades, 39.7% win rate, expectancy +0.19R.
+In-sample: 104 trades, 40.4% win rate, expectancy +0.212R.
+Held-out (most recent 365 days, genuine out-of-sample): 22 trades, win
+rate 36.4%, expectancy +0.091R. The sign HELD (positive in-sample AND
+held-out) -- a real weakening from in-sample to held-out (not "held
+steady"), but the same directional pattern as TrendContinuationBOS's own
+original EMA21 filter validation, and with a LARGER held-out sample
+(22 trades here vs. 10-14 there). This clears this project's own
+established bar: positive held-out expectancy, n>=5, same sign as
+in-sample. Regime breakdown on ETH: `sideways` (51 trades, +0.412R) is
+this strategy's BEST regime here -- notably the OPPOSITE of
+TrendContinuationBOS's own ETH result, where `sideways` is one of its
+worst regimes (-0.385R, see trend_continuation_bos.py) -- confirming this
+is a genuinely different edge, not a re-discovery of BOS's ETH behavior
+under a different name. `weak_bull_trend` (53 trades, +0.189R) is also
+positive; `strong_bull_trend` (-0.250R) and `strong_bear_trend` (-0.400R)
+are negative, both modest-sized buckets (12 and 10 trades).
+
+Held-out sample sizes are modest on both assets (27 BTC, 22 ETH) --
+normal caveat that exact magnitudes aren't precise, direction is what's
+trustworthy. Kept in the codebase as NOT VALIDATED for BTC (candidate
+revision directions unchanged: requiring TrendState.RANGE specifically,
+or gating out `strong_bear_trend`) and VALIDATED for ETH specifically --
+this validation is NOT yet wired into strategies/registry.py, MARKET.pairs,
+or paper_trading/engine.py. Doing so requires a real architecture change
+(today's code hardcodes ONE strategy applied uniformly across every
+symbol in MARKET.pairs -- there is no per-symbol strategy concept yet)
+AND a mandatory re-derivation of max_portfolio_exposure_pct/
+max_correlated_exposure_pct in config.py, which are currently 85% only
+because exactly one position is ever open at a time (see config.py's own
+comments) -- a second concurrent BTC+ETH position becomes real the
+moment this is wired in. See docs/ARCHITECTURE.md's Milestone 10 section
+for the full scoping; nothing has been wired in as of this writing.
 """
 
 from typing import Optional, Set

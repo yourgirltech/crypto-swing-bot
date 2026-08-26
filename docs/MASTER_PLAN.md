@@ -240,9 +240,25 @@ history exists, rather than staying permanently untestable.
   the system before there's a real case for it, even when the case can't
   be checked instantly and requires patiently collecting evidence first.
 
-**Milestone 10:** Market scanner ranking multiple assets by signal
-quality — still gated by strategy → risk → portfolio validation before
-anything becomes a proposal.
+**Milestone 10 (PREREQUISITE MET, 2026-08-26 — scoped, nothing wired in
+yet):** Market scanner ranking multiple assets by signal quality — still
+gated by strategy → risk → portfolio validation before anything becomes
+a proposal. Previously assessed as having no real prerequisite (one
+active asset, nothing to rank). That changed: testing the four shelved
+Milestone 7 strategies against ETHUSDT (same rigor — full period,
+in-sample, held-out) found **Breakout genuinely held-out validates on
+ETH** (held-out: 22 trades, +0.091R, sign held from in-sample) — a real,
+evidenced second asset/strategy pair, independent of `TrendContinuationBOS`'s
+BTC validation. See `strategies/breakout.py`'s docstring and
+docs/ARCHITECTURE.md's Milestone 10 section for the full numbers and an
+explicit scope of what wiring this in would require: today's
+`MARKET.pairs` has no per-symbol strategy concept, `paper_trading/
+engine.py` hardcodes one strategy for every symbol, and reactivating ETH
+for any strategy triggers a mandatory re-derivation of
+`max_portfolio_exposure_pct`/`max_correlated_exposure_pct` (currently 85%
+only because exactly one position is ever open at a time — see
+`config.py`'s own comments). Nothing has been built against this yet —
+scoped, not started.
 — Python: batch processing across symbols efficiently.
 
 **Milestone 11:** On-chain + macro context layers (Phase 3 from the
