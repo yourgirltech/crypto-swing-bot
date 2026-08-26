@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens -- dark terminal / quant-desk aesthetic, confirmed with
+ * user 2026-08-26. Deliberately a single committed dark theme, not a
+ * light/dark toggle -- this is an internal trading instrument panel, not
+ * a public site with varying viewer preferences.
+ */
+:root {
+  --color-base: #0a0e14;
+  --color-surface: #12161d;
+  --color-surface-hover: #171c25;
+  --color-border: #232a35;
+
+  --color-primary: #e6e9ef;
+  --color-muted: #6b7280;
+
+  --color-green: #22c55e;
+  --color-red: #ef4444;
+  --color-amber: #f59e0b;
+}
+
+@theme inline {
+  --color-base: var(--color-base);
+  --color-surface: var(--color-surface);
+  --color-surface-hover: var(--color-surface-hover);
+  --color-border: var(--color-border);
+  --color-primary: var(--color-primary);
+  --color-muted: var(--color-muted);
+  --color-green: var(--color-green);
+  --color-red: var(--color-red);
+  --color-amber: var(--color-amber);
+
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-jetbrains-mono);
+
+  --radius-sharp: 0px;
+  --radius-control: 3px;
+}
+
+body {
+  background: var(--color-base);
+  color: var(--color-primary);
+  font-family: var(--font-sans);
+}
+
+/* Hairline dividers, not drop-shadow cards -- see design brief. */
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+table.data-table {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  border-collapse: collapse;
+  width: 100%;
+}
+
+table.data-table th {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  text-align: left;
+  padding: 0.4rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+table.data-table td {
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+table.data-table tbody tr:hover {
+  background: var(--color-surface-hover);
+}
