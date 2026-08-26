@@ -39,7 +39,7 @@ from backtest.backtest_engine import run_backtest, BacktestResult
 from strategies.base import Strategy
 
 HELD_OUT_DAYS = 365
-SYMBOL = "BTCUSDT"
+SYMBOL = "BTCUSDT"  # default -- see main() for --symbol override (e.g. ETHUSDT)
 
 
 def _held_out_split(full_result: BacktestResult, cutoff, starting_balance: float):
@@ -68,8 +68,8 @@ def _held_out_split(full_result: BacktestResult, cutoff, starting_balance: float
     return in_sample, held_out
 
 
-def validate(strategy: Strategy, df) -> dict:
-    full_result = run_backtest(df, strategy, RISK, SYMBOL, starting_balance=BACKTEST.starting_balance)
+def validate(strategy: Strategy, df, symbol: str = SYMBOL) -> dict:
+    full_result = run_backtest(df, strategy, RISK, symbol, starting_balance=BACKTEST.starting_balance)
     cutoff = df["open_time"].max() - timedelta(days=HELD_OUT_DAYS)
     in_sample, held_out = _held_out_split(full_result, cutoff, BACKTEST.starting_balance)
 
@@ -131,14 +131,20 @@ if __name__ == "__main__":
     import sys as _sys
     _sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-    names = _sys.argv[1:] or ["breakout"]
+    args = _sys.argv[1:]
+    symbol = SYMBOL
+    for flag in list(args):
+        if flag.startswith("--symbol="):
+            symbol = flag.split("=", 1)[1]
+            args.remove(flag)
+    names = args or ["breakout"]
 
     with get_session() as session:
-        asset = get_or_create_asset(session, SYMBOL, exchange=MARKET.exchange, category=MARKET.category)
+        asset = get_or_create_asset(session, symbol, exchange=MARKET.exchange, category=MARKET.category)
         df = get_candles(session, asset, MARKET.primary_timeframe, source="okx")
 
-    print(f"Loaded {len(df)} persisted candles: {df['open_time'].min()} -> {df['open_time'].max()}")
+    print(f"Loaded {len(df)} persisted {symbol} candles: {df['open_time'].min()} -> {df['open_time'].max()}")
 
     for name in names:
-        result = validate(STRATEGIES[name](), df)
+        result = validate(STRATEGIES[name](), df, symbol=symbol)
         print_report(result)
