@@ -6,6 +6,10 @@ const NAV_ITEMS = [
   { href: "/orders", label: "Orders" },
   { href: "/strategies", label: "Strategies" },
   { href: "/backtesting", label: "Backtesting" },
+  { href: "/ai-insights", label: "AI Insights" },
+  { href: "/risk", label: "Risk" },
+  { href: "/journal", label: "Journal" },
+  { href: "/system-health", label: "System Health" },
 ];
 
 export function Sidebar() {

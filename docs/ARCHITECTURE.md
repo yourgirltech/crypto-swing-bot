@@ -468,6 +468,64 @@ markers, and the full 126-trade cumulative-R curve rendering correctly
 out to be a JPEG compression artifact on a 1.5px line, not a real bug —
 confirmed by zooming into the region directly).
 
+## Second batch: AI Insights, Risk, Journal, System Health (Milestone 6)
+
+Four more pages, same real-data-only rule, three small new read-only
+endpoints:
+
+- **Risk page** (`/risk`): `risk/status.py`'s `get_risk_status()` reuses
+  `db.repository.build_portfolio_state()` directly (same function
+  `evaluate_trade()` itself is fed) rather than recomputing account state
+  a third time. New `GET /risk/status` returns the configured `RiskConfig`
+  limits alongside CURRENT usage against each — a `BudgetBar` component
+  (`components/BudgetBar.tsx`) visualizes "X% of Y% used," green/amber/red
+  by proximity to the limit. The recent-verdicts log below it reuses the
+  existing `GET /journal` — no duplicate data source for the same signals.
+- **Journal page** (`/journal`): full filterable browse over `GET
+  /journal`'s existing filters (Milestone 5) — implemented as a plain
+  `<form method="get">` reading/writing URL search params, so filtering
+  works via ordinary navigation with zero client-side JS (Next 16 App
+  Router Server Components read `searchParams` directly). Honest empty
+  state: distinguishes "no signals match these filters" from "signals
+  exist but none has a closed trade yet" rather than one generic "empty."
+- **AI Insights page** (`/ai-insights`): surfaces `reporting.
+  plain_language_summary.explain_full_trade_review()`'s stored text
+  verbatim — added `approval_summary` to `JournalEntry`/`JournalEntryOut`
+  (it was already persisted on `PaperTrade`, Milestone 4, just never
+  surfaced). **Real, load-bearing limitation surfaced rather than
+  patched over**: that text is ONLY generated and stored when a
+  `PaperTrade` is actually created — i.e. the risk engine approved a
+  proposal AND a human was then asked to approve/decline it via
+  `paper_trading/engine.py`. It is never reconstructed after the fact for
+  a signal that didn't reach that stage, because the risk metrics it was
+  built from (budget usage AT THAT TIME) weren't separately persisted on
+  `Signal` — approximating them from current state would silently show
+  the wrong numbers as if they were historical. As of this milestone
+  there are 0 real `paper_trades`, so the page's honest fallback (explains
+  why no stored review exists, shows what IS on record for that signal)
+  is what actually renders today, not a placeholder — verified via
+  screenshot.
+- **System Health page** (`/system-health`): new `GET /system/health`
+  reports what's genuinely checkable live (DB connectivity via a real
+  query, latest persisted candle/signal timestamps) alongside two fields
+  that are hardcoded `False` in the response itself, not just described
+  as caveats in prose: `retry_events_tracked` and
+  `paper_engine_heartbeat_tracked`. Neither is persisted anywhere in this
+  system — `okx_client.py`'s retries are transient and in-process, and
+  `paper_trading/engine.py` is a separate manually-run process with no
+  heartbeat mechanism. The page shows amber "not tracked" indicators with
+  the real reason, rather than a fabricated green checkmark for either.
+
+**Verified visually, same standard as the first batch** — the browser
+tool needed a `wait` before `screenshot` worked reliably this round
+(same intermittent flakiness as before); all four pages confirmed
+rendering real data correctly: actual `RiskConfig` values and budget
+bars at their real (zero) usage, the two real journal entries filterable
+by risk verdict, the honest AI Insights fallback explaining why no
+stored review exists for the latest signal, and System Health's real
+green connectivity dots alongside its honest amber "not tracked"
+indicators.
+
 ## Architecture philosophy
 Deterministic core, LLM synthesis layer (Option 3 from planning discussion),
 evolving toward a proper multi-agent system (Option 2 / LangGraph-style)

@@ -55,6 +55,7 @@ class JournalEntryOut(BaseModel):
     r_multiple_ideal: Optional[float] = None
     r_multiple_realistic: Optional[float] = None
     pnl_ngn: Optional[float] = None
+    approval_summary: Optional[str] = None
 
 
 class PerformanceStatsOut(BaseModel):
@@ -159,3 +160,49 @@ class AccountSummaryOut(BaseModel):
     max_weekly_loss_pct: float
     max_open_positions: int
     max_drawdown_pct: float
+
+
+class CorrelatedGroupExposureOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    symbols: List[str]
+    notional: float
+    exposure_pct: float
+
+
+class RiskStatusOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    risk_per_trade_pct: float
+    max_position_size_pct: float
+    max_portfolio_exposure_pct: float
+    max_correlated_exposure_pct: float
+    max_daily_loss_pct: float
+    max_weekly_loss_pct: float
+    max_drawdown_pct: float
+    max_open_positions: int
+    max_leverage: float
+    correlated_groups: List[List[str]]
+
+    account_equity: float
+    peak_equity: float
+    drawdown_pct: float
+    daily_pnl_pct: float
+    weekly_pnl_pct: float
+    open_positions_count: int
+    portfolio_exposure_pct: float
+    correlated_exposure: List[CorrelatedGroupExposureOut]
+
+
+class SystemHealthOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    api_ok: bool
+    db_ok: bool
+    latest_candle_time: Optional[datetime] = None
+    latest_signal_time: Optional[datetime] = None
+    configured_poll_interval_seconds: int
+    # Explicitly False, not omitted -- see api/routes/system.py's docstring
+    # for why these two are genuinely untracked, not just unpopulated.
+    retry_events_tracked: bool
+    paper_engine_heartbeat_tracked: bool
