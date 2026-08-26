@@ -158,10 +158,32 @@ System Health pages after.
 — Trading: understanding what numbers matter enough to surface (win
   rate, expectancy, drawdown, exposure) vs. vanity metrics.
 
-**Milestone 7:** Additional strategy modules (breakout, pullback, mean-
-reversion, range) — each independently backtested, none assumed
-profitable until proven.
-— Trading: when each strategy style works/fails, tied to regime.
+**Milestone 7 (DONE, 2026-08-26):** Additional strategy modules
+(breakout, pullback, mean-reversion, range) — each independently
+backtested, none assumed profitable until proven. **Actual outcome: one
+validated strategy total (TrendContinuationBOS, from Milestone 3),
+four new ones honestly tested and shelved, not forced into service.**
+Breakout overfit (in-sample edge inverted held-out); Pullback showed no
+edge in-sample or held-out; Mean-reversion showed no edge even after a
+second backtest specifically isolating and removing a real exit-logic
+confound (fixed reward:risk target mismatched to its trade shape); Range
+trading came closest (held-out expectancy near break-even) but still
+didn't clear the validation bar. None are registered in
+`strategies/registry.py` or exposed on the frontend Strategies page — see
+docs/ARCHITECTURE.md's "Milestone 7 close-out" section for full
+per-strategy numbers and reasoning. Real, reusable infrastructure now
+exists for future strategy research regardless of this milestone's
+specific results: `db.repository.get_candles()` (backtest off persisted
+history, no live exchange dependency), `backtest/validate_milestone7.py`
+(a full/in-sample/held-out validation runner, not a one-off script), and
+a `Strategy.compute_take_profit()`/`check_exit()` interface that supports
+a genuine per-strategy exit rather than one fixed target borrowed from
+the first strategy ever built.
+— Trading: when each strategy style works/fails, tied to regime — in
+  this case, four candidates were tested and none held up, which is
+  itself a real trading-knowledge result (BTC 4H apparently rewards this
+  project's specific trend-continuation definition more than these four
+  breakout/pullback/reversion/range definitions did), not a null result.
 
 **Milestone 8:** Market regime detection formalized as an ML
 classification task (features: trend slope, ATR ratio, drawdown/rally

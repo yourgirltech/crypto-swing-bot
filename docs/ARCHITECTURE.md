@@ -851,6 +851,68 @@ until there's a decision on whether Mean-reversion's result (confound
 real but not decisive) makes that additional effort worth it before
 Milestone 7 closes.
 
+## Milestone 7 close-out
+
+**Status: closed.** Four new strategies built against the `Strategy` ABC,
+each independently backtested and held-out validated with the same rigor
+as `TrendContinuationBOS`'s own EMA21 filter — full period, in-sample,
+and held-out (most recent 365 days) reported separately, honestly, per
+strategy:
+
+- **Breakout** — overfit: real in-sample edge (+0.303R) that inverted
+  held-out (-0.111R).
+- **Pullback** — no edge anywhere: negative in-sample AND held-out,
+  smallest sample (38 trades) of the four.
+- **Mean-reversion** — no edge, confirmed twice: negative under the
+  original shared fixed-R exit, and STILL negative held-out
+  (-0.27R) after being given a bb_mid target actually shaped for its own
+  trade type. The exit-logic confound was real (in-sample improved
+  measurably) but not decisive — the entry condition itself doesn't hold
+  up out-of-sample either way.
+- **Range trading** — closest of the four to passing (held-out -0.022R,
+  near break-even, largest sample at 627 trades) but still fails the
+  validation bar under the shared fixed-R exit.
+
+**None are registered in `strategies/registry.py` or exposed on the
+frontend Strategies page.** `TrendContinuationBOS` remains the only
+validated, live strategy — unchanged and unaffected by any of this
+milestone's work (see the byte-for-byte regression check above, and
+PaperTrade #6's confirmed-unaffected stop/target values, re-verified
+against its originally-recorded values one final time before this
+close-out: `stop_price=76341.37`, `target_price=81354.46`,
+`entry_fill_price=78051.4062`, `position_size=5.984337` — identical
+across every checkpoint taken during this milestone's interface changes).
+
+**Why RangeTrading's bigger exit re-test was not pursued further**:
+Mean-reversion is the direct, controlled test of the underlying question
+("does a mismatched fixed-R exit explain a strategy's failure?") — its
+entry and regime gate were unchanged, ONLY the exit changed, and the
+held-out conclusion didn't move. That result is evidence about the
+GENERAL question, not just about Mean-reversion specifically: fixing
+exit logic alone did not reliably rescue an entry that lacks real edge in
+the one case actually tested. RangeTrading's exit fix is more expensive
+than Mean-reversion's was (it needs `swings` threaded through
+`compute_take_profit()` for zone-matching, not just a `window` lookup)
+and RangeTrading is already the closest-to-passing of the four under the
+existing exit — meaning it has the least room for an exit fix to move
+the needle relative to its effort cost, not the most. Given that,
+spending the bigger effort here is not the highest-value next step
+available, so it was held off rather than pursued reflexively just
+because the interface now supports it. This is a judgment call based on
+one data point (Mean-reversion), not a proof that RangeTrading's exit
+mismatch is definitely irrelevant — worth revisiting if a future
+milestone's work makes the opposite-zone target cheap to add for other
+reasons (e.g. if `swings` ends up threaded through for something else
+first).
+
+**What now exists for future strategy research**: `db.repository.
+get_candles()` (backtest off persisted history, no live exchange
+dependency), `backtest/validate_milestone7.py` (reusable full/in-sample/
+held-out validation runner, parametrized by strategy name), and a
+`Strategy.compute_take_profit()`/`check_exit()` interface that supports
+a genuine per-strategy exit, not just a shared fixed-R one — all
+reusable for any future strategy idea, not specific to these four.
+
 ## Architecture philosophy
 Deterministic core, LLM synthesis layer (Option 3 from planning discussion),
 evolving toward a proper multi-agent system (Option 2 / LangGraph-style)
