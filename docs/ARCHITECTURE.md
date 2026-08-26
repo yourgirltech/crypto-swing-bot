@@ -749,6 +749,43 @@ have only been fairly compared against each other and against
 for the scoping of what a per-strategy `compute_take_profit()` would take
 to give them that fair re-test.
 
+**Range trading** (`strategies/range_trading.py`) — the structural
+counterpart to Mean-reversion's statistical one: a bounce off a
+support/resistance zone built from the shared swing engine
+(`build_sr_zones`), hard-gated to `TrendState.RANGE` (from the swing
+HH/HL/LH/LL sequence) rather than Mean-reversion's `sideways` REGIME
+(EMA-slope/ATR derived) — two independently-derived "is this ranging?"
+signals that can and do disagree on individual bars.
+
+**Result: NOT VALIDATED — but the closest of the four to passing.** Full
+period (627 trades, by far the largest sample built in this milestone):
+37.2% win rate, expectancy +0.115R. In-sample (489 trades): +0.153R.
+Held-out (most recent 365 days, 138 trades): **-0.022R** — technically
+negative, so it fails the file's own bar, but close to break-even, not a
+clear negative like Pullback (-0.143R) or Mean-reversion (-0.276R). Same
+directional shape as Breakout's failure (positive in-sample, negative
+held-out) but far milder — "didn't survive out-of-sample," not
+"inverted." Held-out max drawdown (-40.86%) is a real concern
+independent of the expectancy discussion — the largest drawdown of any
+strategy/slice in this milestone.
+
+Worth stating plainly rather than glossing over: the regime breakdown
+shows this strategy's actual positive expectancy concentrated in
+`weak_bull_trend` (+0.200R, 275 trades) and `strong_bull_trend` (+0.500R,
+16 trades) — NOT in `sideways` (+0.034R, barely positive, its largest
+bucket at 322 trades), which is where a genuine range-trading edge would
+be expected to show up most cleanly. This is the TrendState-vs-Regime
+disagreement in practice: many `TrendState.RANGE` bars occur during
+periods the EMA-slope regime classifier still calls a bull trend
+(consolidation/whipsaw within an uptrend), not true range-bound sideways
+action — so whatever edge exists here may not actually be "range trading"
+in the sense the label implies. Same shared-2.0R-target caveat as the
+other three applies here too.
+
+Kept in the codebase (not deleted), not registered in
+`strategies/registry.py` or exposed on the frontend Strategies page while
+unvalidated.
+
 ## Architecture philosophy
 Deterministic core, LLM synthesis layer (Option 3 from planning discussion),
 evolving toward a proper multi-agent system (Option 2 / LangGraph-style)
