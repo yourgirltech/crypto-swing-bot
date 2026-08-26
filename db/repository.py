@@ -12,8 +12,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from db.models import (
-    Asset, BacktestRun, BacktestTrade, Candle, EngineHeartbeat, HumanDecision, PaperTrade,
-    PaperTradeStatus, RetryEvent, Signal, SignalStatus,
+    Asset, BacktestRun, BacktestTrade, Candle, DerivativesSnapshot, EngineHeartbeat, HumanDecision,
+    PaperTrade, PaperTradeStatus, RetryEvent, Signal, SignalStatus,
 )
 from backtest.backtest_engine import Trade
 from proposals.trade_proposal import TradeProposal
@@ -326,4 +326,26 @@ def get_latest_heartbeat(session: Session, engine_name: str) -> Optional[EngineH
         select(EngineHeartbeat)
         .where(EngineHeartbeat.engine_name == engine_name)
         .order_by(EngineHeartbeat.checked_in_at.desc())
+    )
+
+
+def record_derivatives_snapshot(session: Session, symbol: str, funding_rate: Optional[float],
+                                 open_interest: Optional[float], long_short_ratio: Optional[float],
+                                 source: str) -> DerivativesSnapshot:
+    """Called from paper_trading/engine.py's run_once() -- see db/models.py's DerivativesSnapshot docstring (Milestone 9, deferred as a live feature -- collection only)."""
+    snap = DerivativesSnapshot(
+        symbol=symbol, funding_rate=funding_rate, open_interest=open_interest,
+        long_short_ratio=long_short_ratio, source=source,
+    )
+    session.add(snap)
+    session.flush()
+    return snap
+
+
+def get_latest_derivatives_snapshot(session: Session, symbol: str) -> Optional[DerivativesSnapshot]:
+    """Not consumed by any live code today -- exists for verification/future evidence-gathering only."""
+    return session.scalar(
+        select(DerivativesSnapshot)
+        .where(DerivativesSnapshot.symbol == symbol)
+        .order_by(DerivativesSnapshot.captured_at.desc())
     )

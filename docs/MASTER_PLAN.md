@@ -216,9 +216,29 @@ signal.
   — and, as it turned out, avoiding building a solution before confirming
   there's a real problem it solves.
 
-**Milestone 9:** Derivatives data (funding rate, open interest,
-long/short skew) as contextual filters, not signals.
-— Trading: what funding rate extremes and OI buildup actually indicate.
+**Milestone 9 (DEFERRED, 2026-08-26 — not done, not silently skipped):**
+Derivatives data (funding rate, open interest, long/short skew) as
+contextual filters, not signals. **Checked for evidence before wiring
+anything into the live trading path, same standard as Milestone 8:** no
+existing evidence (nothing tracked before), and — confirmed by directly
+hitting OKX's live API, not assumed — the obvious retroactive test
+(align funding/OI/long-short history against the 126 already-persisted
+`TrendContinuationBOS` trades) is structurally impossible: all three OKX
+endpoints cap out at ~3 months of public history (earliest reached:
+2026-05-19/25), against a nearly 5-year trade history. See
+docs/ARCHITECTURE.md's "Milestone 9 — DEFERRED" section for the exact
+endpoints/dates checked. **Built instead: passive collection only** — a
+new `derivatives_snapshots` table plus three new `OKXClient` methods,
+called once per `paper_trading/engine.py` poll cycle, verified with a
+real poll/save cycle (real values persisted, failure-isolation boundary
+confirmed with a bogus symbol). Not read by any strategy, risk engine, or
+dashboard page — purely to start accumulating real, aligned data now, so
+a genuine evidence-based test is possible after enough paper-trading
+history exists, rather than staying permanently untestable.
+— Trading: what funding rate extremes and OI buildup actually indicate
+  — and, same lesson as Milestone 8, not assuming a feature belongs in
+  the system before there's a real case for it, even when the case can't
+  be checked instantly and requires patiently collecting evidence first.
 
 **Milestone 10:** Market scanner ranking multiple assets by signal
 quality — still gated by strategy → risk → portfolio validation before

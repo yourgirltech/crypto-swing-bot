@@ -53,7 +53,7 @@ from db.models import Asset, HumanDecision, PaperTrade, Signal
 from db.repository import (
     build_portfolio_state, close_paper_trade, create_paper_trade,
     get_open_paper_trade, get_or_create_asset, has_signal_for_candle,
-    record_heartbeat, record_human_decision, save_candles, save_signal,
+    record_derivatives_snapshot, record_heartbeat, record_human_decision, save_candles, save_signal,
 )
 
 DATA_SOURCE = "okx"
@@ -116,6 +116,30 @@ def _get_reference_stats(symbol: str, strategy) -> tuple:
     return summary, regime_breakdown
 
 
+def _collect_derivatives_snapshot(symbol: str) -> None:
+    """
+    Milestone 9 (DEFERRED as a live feature -- see docs/ARCHITECTURE.md's
+    "Milestone 9 -- DEFERRED" section). PASSIVE COLLECTION ONLY: not read
+    by any strategy, risk engine, or dashboard page today. Wrapped in its
+    own try/except so a failure here (or a partial one -- each of the
+    three OKX calls independently returns None on its own failure, see
+    OKXClient.get_funding_rate/get_open_interest/get_long_short_ratio)
+    can NEVER affect the actual trading poll cycle that follows -- same
+    principle as okx_client.py's _log_retry_event.
+    """
+    try:
+        client = OKXClient(testnet=False, category=MARKET.category)
+        funding_rate = client.get_funding_rate(symbol)
+        open_interest = client.get_open_interest(symbol)
+        long_short_ratio = client.get_long_short_ratio(symbol)
+        with get_session() as session:
+            record_derivatives_snapshot(
+                session, symbol, funding_rate, open_interest, long_short_ratio, source=DATA_SOURCE,
+            )
+    except Exception as e:
+        print(f"[{symbol}] Derivatives snapshot collection failed (non-critical, skipped this cycle): {e!r}")
+
+
 def run_once(symbol: str) -> None:
     # Recorded FIRST, before any fetch/logic -- proof of liveness for the
     # System Health page even if this cycle later raises. A cycle that
@@ -123,6 +147,8 @@ def run_once(symbol: str) -> None:
     # at this timestamp, which is the actual thing "is it running" asks.
     with get_session() as session:
         record_heartbeat(session, ENGINE_NAME, symbol=symbol, detail="poll cycle started")
+
+    _collect_derivatives_snapshot(symbol)
 
     strategy = TrendContinuationBOS()
     backtest_summary, regime_breakdown = _get_reference_stats(symbol, strategy)

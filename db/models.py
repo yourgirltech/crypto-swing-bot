@@ -318,3 +318,36 @@ class EngineHeartbeat(Base):
     checked_in_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     symbol: Mapped[str | None] = mapped_column(String(20), nullable=True)
     detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class DerivativesSnapshot(Base):
+    """
+    Milestone 9 (DEFERRED as a live feature -- see docs/ARCHITECTURE.md's
+    "Milestone 9 -- DEFERRED" section) -- PASSIVE COLLECTION ONLY. Not
+    read by any strategy, risk engine, or dashboard page today. Exists
+    purely to start accumulating real, aligned funding rate / open
+    interest / long-short ratio data now, one row per paper_trading/
+    engine.py poll cycle, so that after enough real paper-trading history
+    exists there's an actual evidence base to test whether extreme
+    funding/positioning correlates with worse trade outcomes -- retroactive
+    testing against the existing 5yr candle/trade history is structurally
+    impossible, since OKX's public API only retains ~3 months of this
+    data (confirmed directly against the live endpoints, not assumed).
+
+    Collected best-effort from paper_trading/engine.py: a collection
+    failure here must never break the actual trading poll cycle, so the
+    call site wraps this in its own try/except that swallows everything --
+    same principle as RetryEvent above. Fields are nullable because any
+    one of the three OKX endpoints can fail independently without the
+    others; a partial snapshot (e.g. funding_rate but not open_interest)
+    is still worth keeping rather than discarding the whole row.
+    """
+    __tablename__ = "derivatives_snapshots"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    symbol: Mapped[str] = mapped_column(String(20), nullable=False)
+    captured_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    funding_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    open_interest: Mapped[float | None] = mapped_column(Float, nullable=True)  # contracts, BTC-USDT-SWAP's own unit (oiCcy)
+    long_short_ratio: Mapped[float | None] = mapped_column(Float, nullable=True)  # long/short account ratio, >1 means more long accounts
+    source: Mapped[str] = mapped_column(String(20), nullable=False)  # "okx"

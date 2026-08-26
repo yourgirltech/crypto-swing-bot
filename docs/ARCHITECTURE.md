@@ -971,6 +971,77 @@ milestone's evidence suggests such a signal exists to find, but that is
 a different, harder question than "recreate the existing rule engine
 with a model," and hasn't actually been tested.
 
+## Milestone 9 — DEFERRED (not done, not silently skipped)
+
+MASTER_PLAN.md's Milestone 9 called for derivatives data (funding rate,
+open interest, long/short positioning) as a contextual filter on trade
+proposals — not a trading signal itself. Same evidence-first standard as
+Milestone 8 was applied before writing anything into the live trading
+path: is there a concrete, evidenced case for this, or should the case be
+tested first?
+
+**No existing evidence exists — a different situation from Milestone 8.**
+Milestone 8 could be checked against Milestone 7's just-built trade
+history; the evidence already existed. Nothing in this system has ever
+tracked funding rate, open interest, or long/short ratio, so there was no
+retroactive evidence sitting in the DB to check.
+
+**The obvious retroactive test is structurally impossible, not just
+costly — confirmed by directly hitting OKX's live API, not assumed.**
+The natural next move would be pulling historical funding
+rate/OI/long-short ratio for `BTC-USDT-SWAP` and aligning it against the
+126 already-persisted `TrendContinuationBOS` backtest trades (`backtest_
+runs` id 8, spanning 2021-08-26 → 2026-07-31) to check whether extreme
+funding/positioning correlated with worse outcomes. Tried this directly:
+- `GET /api/v5/public/funding-rate-history`, paginated fully back: empty
+  page reached at **2026-05-25**.
+- `GET /api/v5/rubik/stat/contracts/open-interest-history`, 1,500 rows
+  paginated: earliest **2026-05-19**.
+- `GET /api/v5/rubik/stat/contracts/long-short-account-ratio-contract`,
+  same pagination: earliest **2026-05-19**.
+
+All three OKX endpoints cap out at roughly 3 months of public history.
+Our trade history spans nearly 5 years. At most 1-3 of the 126 trades
+would even have overlapping data — nowhere near a sample worth drawing a
+conclusion from. This is a hard ceiling on the public API itself, not a
+"haven't gotten to it yet."
+
+**Status: DEFERRED as a live feature, not done, not silently dropped.**
+No evidence justifies wiring this into `trade_proposal.py`/the risk
+engine/any dashboard page today, and the obvious way to manufacture that
+evidence retroactively doesn't work.
+
+**What was built instead: passive collection only, to make the test
+possible in the future.** A new `derivatives_snapshots` table
+(`db/models.py`'s `DerivativesSnapshot`, migration `a16a09ba6d99`) plus
+three new `OKXClient` methods (`get_funding_rate`/`get_open_interest`/
+`get_long_short_ratio`, hitting the perpetual-swap instrument
+`BTC-USDT-SWAP` — a structurally different instrument from the spot pair
+this project actually trades, used here purely as sentiment/positioning
+CONTEXT) are called once per `paper_trading/engine.py` poll cycle via
+`_collect_derivatives_snapshot()`. This is collection only: not read by
+`strategies/`, `risk/`, `proposals/trade_proposal.py`, or any frontend
+page. Deliberately no retry-with-backoff (unlike `get_klines`) — this is
+non-critical context data, so each of the three OKX calls independently
+returns `None` on its own failure rather than raising, and the whole
+collection step is wrapped so a failure can never affect the actual
+trading poll cycle that follows (same principle as `okx_client.py`'s
+`_log_retry_event`). Verified with a real poll/save cycle before
+considering this done: `get_funding_rate('BTCUSDT')` /
+`get_open_interest('BTCUSDT')` / `get_long_short_ratio('BTCUSDT')`
+returned real values (funding_rate≈2.48e-5, open_interest≈28,926.9,
+long_short_ratio≈1.146) and persisted correctly; also verified the
+failure-isolation boundary directly with a bogus symbol — no exception
+escaped, and a partial (all-`None`) row was still correctly persisted
+rather than silently dropped.
+
+The goal is purely to start accumulating real, aligned data now, so that
+after enough real paper-trading history exists, there's an actual
+evidence base to test whether extreme funding/positioning correlates
+with worse trade outcomes — for real, on this project's own trade
+history, rather than staying permanently unable to test it because the
+public API's retroactive window is too short.
+
 ## Architecture philosophy
 Deterministic core, LLM synthesis layer (Option 3 from planning discussion),
 evolving toward a proper multi-agent system (Option 2 / LangGraph-style)
