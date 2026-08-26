@@ -44,7 +44,9 @@ from datetime import datetime, timedelta, timezone
 from config.config import BACKTEST, MARKET, RISK
 from data.okx_client import OKXClient
 from backtest.backtest_engine import run_backtest
+from strategies.base import Strategy
 from strategies.trend_continuation_bos import TrendContinuationBOS
+from strategies.breakout import Breakout
 from proposals.trade_proposal import build_proposal
 from reporting.plain_language_summary import explain_full_trade_review
 from risk.risk_engine import evaluate_trade
@@ -62,8 +64,32 @@ POLL_INTERVAL_SECONDS = 900  # 15 min -- see module docstring for why polling, n
 HISTORY_DAYS = 120  # plenty of warmup for indicators/structure; cheap to refetch each poll via OKXClient's existing retry logic
 REFERENCE_BACKTEST_REFRESH = timedelta(hours=24)  # how often to refresh the backtested-stats context below
 
-# Cache of {symbol: (summary, regime_breakdown, last_refreshed_at)} -- see
-# _get_reference_stats(). A live proposal needs the FULL backtested history
+# Per-symbol-strategy mapping -- Milestone 10 prerequisite work (see
+# docs/ARCHITECTURE.md's Milestone 10 section). Each symbol runs its OWN
+# validated strategy; this is NOT "one strategy applied to every symbol"
+# (the old hardcoded `TrendContinuationBOS()` inside run_once() was
+# exactly that limitation). Strategy instances are stateless (see
+# strategies/base.py's own docstring) so sharing one instance per symbol
+# across polls/backtests is safe.
+#
+# NOTE: this mapping existing does NOT mean ETH is live -- MARKET.pairs is
+# still ["BTCUSDT"] only (see config/config.py), and main()'s loop below
+# iterates MARKET.pairs, not this mapping's full key set. ETHUSDT's entry
+# here is real, correct, and unused until MARKET.pairs actually includes
+# it -- a deliberate, separate decision, not made by adding this mapping.
+STRATEGY_FOR_SYMBOL: dict[str, Strategy] = {
+    "BTCUSDT": TrendContinuationBOS(),
+    "ETHUSDT": Breakout(),
+}
+
+# Cache of {(symbol, strategy.name): (summary, regime_breakdown,
+# last_refreshed_at)} -- see _get_reference_stats(). Keyed by (symbol,
+# strategy) rather than symbol alone: a cache keyed by symbol only would
+# silently return the WRONG strategy's backtested stats if the same
+# symbol were ever evaluated under two different strategies (not the
+# case today -- one strategy per symbol -- but a real correctness trap
+# once STRATEGY_FOR_SYMBOL exists as a real mapping rather than a single
+# hardcoded strategy). A live proposal needs the FULL backtested history
 # (BACKTEST.history_days, ~5yr) to show a real win rate/expectancy/sample
 # size, which is far more data than the ~120-day window HISTORY_DAYS fetches
 # for indicator/structure warmup on every poll -- refetching 5yr of candles
@@ -103,16 +129,17 @@ def _get_reference_stats(symbol: str, strategy) -> tuple:
     real "backtested win rate/expectancy/sample size for this exact setup
     type" instead of always coming back empty.
     """
-    cached = _reference_stats_cache.get(symbol)
+    cache_key = (symbol, strategy.name)
+    cached = _reference_stats_cache.get(cache_key)
     if cached is not None and datetime.now(timezone.utc) - cached[2] < REFERENCE_BACKTEST_REFRESH:
         return cached[0], cached[1]
 
-    print(f"[{symbol}] Refreshing reference backtest ({BACKTEST.history_days} days) for backtested-stats context...")
+    print(f"[{symbol}] Refreshing reference backtest ({BACKTEST.history_days} days, {strategy.name}) for backtested-stats context...")
     client = OKXClient(testnet=False, category=MARKET.category)
     df = client.get_historical_klines(symbol, MARKET.primary_timeframe, days=BACKTEST.history_days)
     bt = run_backtest(df, strategy, RISK, symbol, starting_balance=BACKTEST.starting_balance)
     summary, regime_breakdown = bt.summary(), bt.by_regime()
-    _reference_stats_cache[symbol] = (summary, regime_breakdown, datetime.now(timezone.utc))
+    _reference_stats_cache[cache_key] = (summary, regime_breakdown, datetime.now(timezone.utc))
     return summary, regime_breakdown
 
 
@@ -140,7 +167,7 @@ def _collect_derivatives_snapshot(symbol: str) -> None:
         print(f"[{symbol}] Derivatives snapshot collection failed (non-critical, skipped this cycle): {e!r}")
 
 
-def run_once(symbol: str) -> None:
+def run_once(symbol: str, strategy: Strategy) -> None:
     # Recorded FIRST, before any fetch/logic -- proof of liveness for the
     # System Health page even if this cycle later raises. A cycle that
     # errors out still proves the process was alive and attempting work
@@ -150,7 +177,6 @@ def run_once(symbol: str) -> None:
 
     _collect_derivatives_snapshot(symbol)
 
-    strategy = TrendContinuationBOS()
     backtest_summary, regime_breakdown = _get_reference_stats(symbol, strategy)
 
     client = OKXClient(testnet=False, category=MARKET.category)
@@ -282,7 +308,8 @@ def main():
     while True:
         for symbol in MARKET.pairs:
             try:
-                run_once(symbol)
+                strategy = STRATEGY_FOR_SYMBOL[symbol]
+                run_once(symbol, strategy)
             except Exception as e:
                 print(f"[{symbol}] Error during poll cycle: {e!r}")
         time.sleep(POLL_INTERVAL_SECONDS)

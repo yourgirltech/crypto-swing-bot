@@ -35,34 +35,51 @@ class RiskConfig:
     # (4.0% of trades) ever hit this cap; every normal trade sizes at its
     # full risk_per_trade_pct target, as intended.
     max_position_size_pct: float = 85.0        # per-trade notional cap, % of account equity
-    # max_portfolio_exposure_pct / max_correlated_exposure_pct RECALIBRATED
-    # to 85% too (2026-08-25), same day as max_position_size_pct, for a
-    # DIFFERENT and TEMPORARY reason -- read before ever changing ETH's
-    # paused status or MARKET.pairs:
+    # max_portfolio_exposure_pct / max_correlated_exposure_pct were 85%
+    # (2026-08-25) ONLY because BTC was the sole active symbol and no
+    # second concurrent position was ever possible -- "portfolio exposure"
+    # and "correlated exposure" collapsed to "this one position's own
+    # notional," identical to what max_position_size_pct already measures.
+    # That comment explicitly flagged this as temporary and required
+    # re-derivation "the moment ETH resumes trading" -- this is that
+    # re-derivation, ahead of ETH actually going live (Breakout validated
+    # on ETH per Milestone 7/10; MARKET.pairs is still BTC-only as of this
+    # value change -- see strategies/registry.py/docs/ARCHITECTURE.md's
+    # Milestone 10 section for what's still not wired in).
     #
-    # *** These three values are only equal because BTC is the sole active
-    # *** symbol AND max_open_positions effectively never allows two
-    # *** concurrent BTC positions (paper_trading/engine.py won't open a
-    # *** second position on an asset that already has one open). With
-    # *** correlated_groups containing only one CURRENTLY-TRADED asset,
-    # *** "portfolio exposure" and "correlated exposure" collapse to
-    # *** "this one position's own notional" -- IDENTICAL to what
-    # *** max_position_size_pct already measures. Confirmed via full
-    # *** 126-trade backtest re-run: at the old 50%/30%, mean effective
-    # *** risk was dragged down to 0.689% (vs the ~1% target) purely by
-    # *** this coincidence, not a deliberate portfolio-risk decision.
-    #
-    # *** THE MOMENT ETH RESUMES TRADING (a second concurrent position
-    # *** becomes real), max_correlated_exposure_pct (and, once
-    # *** max_open_positions can actually reach 2, max_portfolio_exposure_pct
-    # *** too) MUST be independently reassessed against real two-asset
-    # *** combined-exposure data -- do NOT assume 85% still fits just
-    # *** because it's already sitting there. This is a coincidence of
-    # *** today's BTC-only reality, not a permanent design decision.
-    max_portfolio_exposure_pct: float = 85.0   # total notional across all open positions, % of account equity
+    # *** RECALIBRATED 2026-08-26 to 90%, using real data, same "run
+    # *** uncapped, find the natural gap" methodology as
+    # *** max_position_size_pct's own derivation above -- not guessed.
+    # *** backtest/combined_portfolio_backtest.py ran TrendContinuationBOS-
+    # *** on-BTC concurrent with Breakout-on-ETH as ONE real portfolio
+    # *** (shared balance, both positions tracked simultaneously) across
+    # *** their aligned 5yr 4H history, with these two caps set to an
+    # *** effectively-uncapped 1000% to observe the natural distribution.
+    # *** Result: 49 genuine concurrent entries (one asset entering while
+    # *** the other was already open). Combined notional -- both
+    # *** positions' notional together, as % of equity -- clustered
+    # *** continuously from 27.45% up to ~88.90%, then jumped straight to
+    # *** 107.61% and 141.45% (two outliers), nothing in between -- the
+    # *** same shape of gap that justified 85% for max_position_size_pct.
+    # *** 90% sits in that gap: above the natural cluster ceiling (so it
+    # *** doesn't clip real, reasonable concurrent trades the way the old
+    # *** 85% value clipped 3 of 48 real historical concurrent entries
+    # *** under the CURRENT caps), below the outlier jump (so it still
+    # *** backstops the two genuine over-100%-of-equity scenarios that
+    # *** max_leverage=1.0 alone would NOT catch, since that check is
+    # *** per-trade notional only, not combined across positions).
+    # *** CONFIDENCE CAVEAT: 49 concurrent-entry observations is a much
+    # *** smaller sample than the 126-trade sample behind
+    # *** max_position_size_pct=85% -- the SHAPE of the gap (~89% cluster
+    # *** ceiling, then a jump past 100%) is clear, but hold 90% loosely,
+    # *** not as a precisely-optimized number. Re-derive again once real
+    # *** paper-trading history with both positions concurrently open
+    # *** actually accumulates, rather than trusting this backtested
+    # *** estimate indefinitely.
+    max_portfolio_exposure_pct: float = 90.0   # total notional across all open positions, % of account equity
     max_drawdown_pct: float = 15.0             # equity drop from peak that halts ALL new trades (kill switch);
                                                 # deliberately above BTC's backtested max DD (-11.57%) as live-variance buffer
-    max_correlated_exposure_pct: float = 85.0  # combined notional across one correlated_groups entry, % of account equity
+    max_correlated_exposure_pct: float = 90.0  # combined notional across one correlated_groups entry, % of account equity — see max_portfolio_exposure_pct's comment above; identical value for the same reason (BTC+ETH is the only correlated_groups entry and the only two traded assets)
     correlated_groups: List[List[str]] = field(default_factory=lambda: [["BTCUSDT", "ETHUSDT"]])
     # BTC+ETH treated as one correlated group. ETH is paused (see MarketConfig
     # below) so this has nothing real to bite on yet -- see the max_correlated_
