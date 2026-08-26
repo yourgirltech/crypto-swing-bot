@@ -119,11 +119,17 @@ def print_report(result: dict) -> None:
               f"too small to trust the magnitude even if the sign looks good/bad.")
 
 
+STRATEGIES = {
+    "breakout": lambda: __import__("strategies.breakout", fromlist=["Breakout"]).Breakout(),
+    "pullback": lambda: __import__("strategies.pullback", fromlist=["Pullback"]).Pullback(),
+}
+
+
 if __name__ == "__main__":
     import sys as _sys
     _sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-    from strategies.breakout import Breakout
+    names = _sys.argv[1:] or ["breakout"]
 
     with get_session() as session:
         asset = get_or_create_asset(session, SYMBOL, exchange=MARKET.exchange, category=MARKET.category)
@@ -131,5 +137,6 @@ if __name__ == "__main__":
 
     print(f"Loaded {len(df)} persisted candles: {df['open_time'].min()} -> {df['open_time'].max()}")
 
-    result = validate(Breakout(), df)
-    print_report(result)
+    for name in names:
+        result = validate(STRATEGIES[name](), df)
+        print_report(result)
