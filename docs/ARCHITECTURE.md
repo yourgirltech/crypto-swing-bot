@@ -697,57 +697,70 @@ extreme (< 30 for long, > 70 for short), hard-gated to the `sideways`
 regime only (every other regime rejected outright — fading a real trend
 because RSI/BB read "overbought" is exactly the wrong idea to trade).
 
-**Result: NOT VALIDATED.** Full period (132 trades): 29.5% win rate,
-expectancy **-0.114R** — the worst full-period number of the three
-strategies built so far. In-sample (103 trades): -0.068R. Held-out (most
-recent 365 days, 29 trades): **-0.276R** — worse than in-sample, same
-"no edge anywhere" pattern as Pullback rather than Breakout's
-overfit-then-fail-forward shape. Notably, this has the healthiest sample
-size of the three (132 full / 29 held-out, both comfortably above the
-n≥5 reliability bar), so this "no edge" conclusion can be held with MORE
-confidence than Pullback's, not less. The regime gate is doing exactly
-what it was built to do — 100% of trades land in `sideways`, so this
-isn't a mis-gated strategy firing in the wrong regime; the BB+RSI extreme
-entry condition itself doesn't show an edge even restricted to the
-regime it was designed for.
+**Result: NOT VALIDATED — tested twice, against two different exits.**
+Original run (fixed 2.0R target, shared with every other strategy):
+full period (132 trades) -0.114R, in-sample (103 trades) -0.068R,
+held-out (365 days, 29 trades) **-0.276R**.
 
-Candidate revision direction: a fixed 2.0R target (shared across all four
-strategies for interface consistency) may be poorly suited to mean
-reversion specifically — a bounce back toward the band's midline is a
-smaller expected move than a full trend-following 2R extension, so many
-genuine bounces may reverse back through break-even before reaching a 2R
-target sized for a different kind of setup. Testing a tighter R:R or a
-literal `bb_mid` target would require extending
-`Strategy.compute_take_profit()`'s signature (it only receives
-entry/stop prices today, not live band values) — a real interface
-change, not attempted here. Kept in the codebase, not registered in
-`strategies/registry.py` or exposed on the frontend.
+**Re-tested after widening `Strategy.compute_take_profit()`** (see below)
+to target `bb_mid` with a fixed-2.0R fallback when the band sits on the
+wrong side of entry or closer than the stop distance — same 132 trades
+(targeting a different price doesn't change which bars enter): full
+period -0.068R (up from -0.114R), in-sample **-0.011R** (up from -0.068R,
+nearly break-even), held-out **-0.27R** (essentially unchanged from
+-0.276R). `avg_win_r` barely moved off 2.0 (2.02–2.09R across slices) —
+a band-touching entry sits ~2 standard deviations from `bb_mid` by
+construction, typically FARTHER than the old fixed 2R target, not closer,
+so the fixed-R fallback was rarely needed.
 
-**Cross-cutting finding, not per-strategy trivia: all three "NOT
-VALIDATED" strategies above share the same fixed 2:1 reward:risk exit,
-inherited unchanged from `TrendContinuationBOS`.** That target was never
-independently chosen for Breakout/Pullback/Mean-reversion — it was tuned
-around trend-continuation behavior specifically (a BOS entry riding an
-established trend to a 2R extension) and simply reused for interface
-consistency across all four strategies. Mean-reversion's own diagnosis
-above flagged this directly: a reversion trade is a bet on a bounce back
-to the band's midline, a smaller expected move than a full trend
-extension, so a 2R target sized for trend-following may be causing
+**The exit-logic mismatch was real and measurable (in-sample improved
+0.057R once removed) — but fixing it did not validate the strategy.**
+Held-out expectancy is unchanged in every way that matters. This is
+exactly the outcome held-out validation exists to catch: an
+in-sample-only improvement (the exit fix) that didn't survive contact
+with unseen data. The regime gate is still doing exactly what it was
+built to do (100% of trades land in `sideways`), so this remains a
+genuine "the entry condition itself lacks an edge in its own target
+regime" result, not a stale-exit artifact. Kept in the codebase, not
+registered in `strategies/registry.py` or exposed on the frontend.
+
+**Cross-cutting finding, not per-strategy trivia (UPDATE below — this was
+tested for Mean-reversion and the confound turned out not to be the
+whole story): all four strategies originally shared the same fixed 2:1
+reward:risk exit, inherited unchanged from `TrendContinuationBOS`.** That
+target was never independently chosen for Breakout/Pullback/
+Mean-reversion/RangeTrading — it was tuned around trend-continuation
+behavior specifically (a BOS entry riding an established trend to a 2R
+extension) and simply reused for interface consistency. Mean-reversion's
+own diagnosis flagged this directly: a reversion trade is a bet on a
+bounce back to the band's midline, a smaller expected move than a full
+trend extension, so a 2R target sized for trend-following may be causing
 genuine winning bounces to reverse back through break-even before ever
 reaching it.
 
-The same logic applies, with less certainty, to Breakout and Pullback:
+**Resolution (see the Interface widening section below): this was tested
+for Mean-reversion, and the confound was real but not decisive.**
+`Strategy.compute_take_profit()` was widened to receive the live window,
+Mean-reversion was given a genuine `bb_mid` target, and its in-sample
+expectancy DID improve (-0.068R → -0.011R, nearly break-even) — the
+confound was measurable, not imagined. But held-out expectancy barely
+moved (-0.276R → -0.27R), so the strategy is still NOT VALIDATED: the
+entry condition itself lacks a genuine out-of-sample edge, independent of
+which exit it's paired with.
+
+The same logic, untested so far, still applies to Breakout and Pullback:
 neither is a trend-continuation setup either (Breakout catches a
 range→trend transition before structure confirms it; Pullback catches a
 retracement, not a fresh extension), so their entries have not actually
-been tested against an exit shaped for what THEY are — only against one
-shaped for a different, fourth strategy. **This means Breakout and
-Pullback's "no real edge" conclusions may be partly an exit-logic
-mismatch, not purely an entry-logic failure** — as designed, all three
-have only been fairly compared against each other and against
-`TrendContinuationBOS`, not fairly tested on their own terms. See below
-for the scoping of what a per-strategy `compute_take_profit()` would take
-to give them that fair re-test.
+been re-tested against an exit shaped for what THEY are. Given
+Mean-reversion's result, the realistic expectation for a similar re-test
+on Breakout/Pullback is a similar outcome — some in-sample movement,
+held-out conclusion probably unchanged — but that's an expectation, not a
+finding; neither has actually been re-tested. The interface change itself
+is already built and available for either, cheaply, whenever there's
+appetite. RangeTrading's bigger re-test (targeting the opposite S/R zone,
+which needs `swings` threaded through too) remains deliberately deferred
+— see the Interface widening section for why.
 
 **Range trading** (`strategies/range_trading.py`) — the structural
 counterpart to Mean-reversion's statistical one: a bounce off a
@@ -785,6 +798,58 @@ other three applies here too.
 Kept in the codebase (not deleted), not registered in
 `strategies/registry.py` or exposed on the frontend Strategies page while
 unvalidated.
+
+## Interface widening: per-strategy take-profit logic
+
+`Strategy.compute_take_profit(setup, stop_price)` was widened to
+`compute_take_profit(setup, stop_price, window)` so a strategy CAN target
+something other than a fixed reward:risk multiple (e.g. Mean-reversion's
+`bb_mid`) when its own trade shape calls for it — see Mean-reversion's
+result above for why this mattered and what it did/didn't change.
+
+**What actually changed:**
+- `strategies/base.py`'s abstract signature, both call sites
+  (`backtest_engine.py`, `trade_proposal.py`), and a one-line signature
+  update (no logic change) on every strategy that stays fixed-R:
+  `TrendContinuationBOS`, `Breakout`, `Pullback`, `RangeTrading`.
+- Mean-reversion's real logic: target `bb_mid`, falling back to the fixed
+  2.0R target when `bb_mid` is on the wrong side of entry or closer than
+  the stop distance (a sub-1:1 floor, regardless of win rate).
+- **A correctness issue found mid-implementation, not part of the
+  original plan**: `Strategy.check_exit()`'s win branch used to hardcode
+  `self.reward_risk` as the realized R-multiple, which was only ever true
+  because every existing strategy's target was exactly
+  `stop_dist * reward_risk` away. Once a target can be something else
+  (`bb_mid`), the realized R-multiple on a win depends on `entry_price`
+  too — so `check_exit()` was also widened to receive it
+  (`check_exit(direction, entry_price, stop_price, target_price, bar)`),
+  with the same one-line signature update on every non-Mean-reversion
+  strategy. The loss case is unaffected either way — stop distance
+  defines "1R" risk by construction, so a stop-out is always exactly
+  -1.0 regardless of the target.
+
+**Already-open positions are unaffected, verified not assumed**: an open
+`PaperTrade`'s `stop_price`/`target_price` are computed exactly once (in
+`build_proposal()`, before human approval) and persisted as plain floats;
+`_check_open_position()` in `paper_trading/engine.py` reads those stored
+values directly from the DB on every subsequent poll and calls only
+`check_exit()` — never `compute_take_profit()` again. Confirmed against
+paper trade #6 (open at the time of this change) before making any edit.
+
+**Regression check on `TrendContinuationBOS` — the one currently-live
+strategy**: ran the full 5yr backtest before and after this change (via
+`git stash`/`git stash pop` to get a clean before/after) and diffed every
+field of every one of its 126 trades (entry/exit price and time, regime,
+all six diagnostics, position sizing, R-multiple). Byte-for-byte
+identical. The wider signatures don't change its behavior at all.
+
+**Deliberately deferred**: RangeTrading's equivalent re-test (targeting
+the opposite S/R zone) needs `swings` threaded through
+`compute_take_profit()` too — a bigger change (zone-matching must agree
+with what `check_entry()` saw, which needs care to get right) — held off
+until there's a decision on whether Mean-reversion's result (confound
+real but not decisive) makes that additional effort worth it before
+Milestone 7 closes.
 
 ## Architecture philosophy
 Deterministic core, LLM synthesis layer (Option 3 from planning discussion),

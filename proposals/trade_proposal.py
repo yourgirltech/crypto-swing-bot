@@ -88,7 +88,7 @@ def build_proposal(df: pd.DataFrame, symbol: str, strategy: Strategy,
         return None
 
     stop = strategy.compute_stop_loss(setup, df)
-    target = strategy.compute_take_profit(setup, stop)
+    target = strategy.compute_take_profit(setup, stop, df)
 
     account_balance = portfolio.account_equity
     risk_amount_target = account_balance * (risk_config.risk_per_trade_pct / 100)

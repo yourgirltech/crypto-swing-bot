@@ -154,10 +154,16 @@ def _check_open_position(symbol: str, open_trade_id: int, strategy, latest_bar, 
     with get_session() as session:
         open_trade = session.get(PaperTrade, open_trade_id)
         direction, stop_price, target_price = open_trade.direction, open_trade.stop_price, open_trade.target_price
+        proposed_entry_price = open_trade.proposed_entry_price
         entry_fill_price, entry_fee = open_trade.entry_fill_price, open_trade.entry_fee
         position_size, risk_amount = open_trade.position_size, open_trade.risk_amount
 
-    exit_result = strategy.check_exit(direction, stop_price, target_price, latest_bar)
+    # proposed_entry_price (pre-slippage), not entry_fill_price -- check_exit's
+    # r_multiple is the "ideal" backtest-style figure (see the print below),
+    # matching backtest_engine.Trade.entry_price's same pre-slippage semantics.
+    # The REALISTIC r_multiple (post-slippage/fees) is computed separately
+    # below from entry_fill_price/exit_fill_price, same as before this change.
+    exit_result = strategy.check_exit(direction, proposed_entry_price, stop_price, target_price, latest_bar)
     if exit_result is None:
         print(f"[{symbol}] Paper trade #{open_trade_id} still open ({direction}, entry {entry_fill_price:.2f}). "
               f"No stop/target hit on latest closed candle ({latest_candle_time}).")

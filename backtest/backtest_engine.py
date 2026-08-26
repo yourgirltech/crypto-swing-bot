@@ -198,7 +198,7 @@ def run_backtest(df: pd.DataFrame, strategy: Strategy, risk_config: RiskConfig, 
 
         if in_trade:
             exit_result = strategy.check_exit(
-                open_trade.direction, open_trade.stop_price, open_trade.target_price, bar
+                open_trade.direction, open_trade.entry_price, open_trade.stop_price, open_trade.target_price, bar
             )
             if exit_result is not None:
                 open_trade.exit_index = i
@@ -233,7 +233,7 @@ def run_backtest(df: pd.DataFrame, strategy: Strategy, risk_config: RiskConfig, 
             continue
 
         stop = strategy.compute_stop_loss(setup, window)
-        target = strategy.compute_take_profit(setup, stop)
+        target = strategy.compute_take_profit(setup, stop, window)
 
         risk_amount_target = balance * (risk_config.risk_per_trade_pct / 100)
         raw_size = strategy.position_size(risk_amount_target, setup.entry_price, stop)

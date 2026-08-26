@@ -92,18 +92,39 @@ class Strategy(ABC):
         """Stop-loss price for a confirmed, non-invalidated setup."""
 
     @abstractmethod
-    def compute_take_profit(self, setup: EntrySetup, stop_price: float) -> float:
-        """Take-profit price for a confirmed, non-invalidated setup."""
+    def compute_take_profit(self, setup: EntrySetup, stop_price: float, window: pd.DataFrame) -> float:
+        """
+        Take-profit price for a confirmed, non-invalidated setup. `window`
+        is the same no-lookahead window check_entry/compute_stop_loss see
+        -- added so a strategy CAN target something other than a fixed
+        reward:risk multiple (e.g. a Bollinger Band midline for a
+        mean-reversion setup) when its own trade shape calls for it. A
+        strategy that just wants a fixed R-multiple is free to ignore this
+        argument entirely -- see TrendContinuationBOS/Breakout/Pullback/
+        RangeTrading, none of which use it.
+        """
 
     @abstractmethod
     def position_size(self, risk_amount: float, entry_price: float, stop_price: float) -> float:
         """Units to buy/sell so risk_amount is what's actually at risk to the stop."""
 
     @abstractmethod
-    def check_exit(self, direction: str, stop_price: float, target_price: float,
+    def check_exit(self, direction: str, entry_price: float, stop_price: float, target_price: float,
                     bar: pd.Series) -> Optional[ExitResult]:
         """
         Checks ONE bar of an already-open position against this strategy's
         exit rule. Returns an ExitResult if the position closes on this
         bar, else None (still open).
+
+        `entry_price` was added alongside compute_take_profit()'s `window`
+        param (see there) for the same reason: once a strategy's target
+        isn't guaranteed to be exactly stop_dist * some fixed
+        reward:risk away (e.g. MeanReversion's bb_mid target), the actual
+        realized R-multiple on a win depends on entry_price too, not just
+        stop/target. A strategy whose target IS always a fixed multiple of
+        the stop distance can keep returning that constant on a win and
+        ignore this argument -- see TrendContinuationBOS/Breakout/
+        Pullback/RangeTrading. The loss case is unaffected either way:
+        stop distance defines "1R" risk by construction, so a stop-out is
+        always exactly -1.0 regardless of what the target was.
         """
