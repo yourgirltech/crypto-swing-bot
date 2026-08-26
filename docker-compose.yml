@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: crypto-swing-bot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: swingbot
+      POSTGRES_PASSWORD: swingbot
+      POSTGRES_DB: swingbot
+    ports:
+      # Host 5433 -> container 5432: host 5432 is already used by another
+      # project's Postgres container on this machine.
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U swingbot -d swingbot"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

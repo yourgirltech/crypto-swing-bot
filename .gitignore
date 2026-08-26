@@ -1,0 +1,16 @@
+venv/
+__pycache__/
+*.pyc
+.env
+logs/*.csv
+logs/*.json
+.DS_Store
+
+# Node / Next.js frontend
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env*.local
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+Thumbs.db
