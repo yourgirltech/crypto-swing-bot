@@ -913,6 +913,64 @@ held-out validation runner, parametrized by strategy name), and a
 a genuine per-strategy exit, not just a shared fixed-R one — all
 reusable for any future strategy idea, not specific to these four.
 
+## Milestone 8 — DEFERRED (not done, not silently skipped)
+
+MASTER_PLAN.md's Milestone 8 called for reformulating `regime/
+regime_classifier.py`'s rule-based thresholds as an ML classification
+task. Before writing any model code, Milestone 7's evidence was checked
+specifically for whether rule-based regime mislabeling actually caused
+any of the four strategy failures — the only concrete evidence this
+project has on hand for whether the current classifier is a real
+bottleneck. **It doesn't show that it is.**
+
+- **Mean-reversion** is the unambiguous test case: its `confirm_entry`
+  hard-gates to `regime == "sideways"`, so 100% of its 132 trades are, by
+  construction, in a bucket the classifier and the strategy agree on —
+  there is no labeling ambiguity to hide behind. It still failed, twice
+  (see above). Regime mislabeling is structurally impossible as the
+  explanation here.
+- **Breakout**: full-period, `sideways` was its BEST bucket (+0.355R),
+  not a sign of harm from mislabeling. Checked the held-out slice
+  specifically for this question: `sideways` (n=14, -0.143R) and
+  `weak_bull_trend` (n=10, -0.100R) fail about equally — if mislabeling
+  drove the held-out collapse, the "maybe-misclassified" bucket should
+  look meaningfully worse than the "correctly-trending" one; it doesn't.
+- **Range trading** was the one strategy with a real full-period
+  TrendState-vs-Regime divergence (edge concentrated in
+  `weak_bull_trend`/`strong_bull_trend`, not the `sideways` bucket its
+  own thesis targets) — the closest thing to a genuine regime-related
+  story in this milestone. Checked held-out specifically: `sideways`
+  (n=73, -0.014R) and `weak_bull_trend` (n=64, -0.016R) are essentially
+  identical out-of-sample. The in-sample divergence didn't survive —
+  evidence it was noise, not a real regime-dependent effect.
+- **Pullback**'s failure is concentrated in `weak_bull_trend`, a regime
+  its own gate correctly allows — no mislabeling story available at all.
+
+**Conclusion: no strategy's failure traces to the classifier getting a
+label wrong that a better classifier would have gotten right.** Building
+an ML classifier without this evidence would very likely just re-derive
+similar EMA-slope/ATR-ratio thresholds with more parameters and less
+explainability — a regression against this project's own stated
+principle (see "Regime classifier" in the Style section above: "every
+label is traceable to the numbers behind it — no black box"), not an
+improvement.
+
+**Status: DEFERRED, not done, not silently dropped.** Milestone 8 in its
+currently-planned form is not evidence-backed today.
+
+**The one legitimate future direction, if revisited**: NOT training a
+model whose ground truth is "what would `classify_regime()` have said"
+— that adds complexity without adding real signal, since it can only
+ever match or underperform the rules it's imitating. If this is
+revisited, it should be supervised directly on REAL trade outcomes (e.g.
+raw features — trend slope, ATR ratio, drawdown/rally magnitude, or
+others — against realized R-multiples across many strategies/trades) to
+find whether some combination of features actually separates winners
+from losers better than the current thresholds do. Nothing in this
+milestone's evidence suggests such a signal exists to find, but that is
+a different, harder question than "recreate the existing rule engine
+with a model," and hasn't actually been tested.
+
 ## Architecture philosophy
 Deterministic core, LLM synthesis layer (Option 3 from planning discussion),
 evolving toward a proper multi-agent system (Option 2 / LangGraph-style)
