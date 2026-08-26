@@ -661,6 +661,31 @@ own docstring for candidate revision directions (requiring
 `strong_bear_trend` bucket). Not registered in `strategies/registry.py`
 or exposed on the frontend Strategies page while unvalidated.
 
+**Pullback** (`strategies/pullback.py`) — requires an already-established
+trend (`classify_trend` says UPTREND/DOWNTREND, the same swing sequencing
+`TrendContinuationBOS` uses), then a pullback to/through EMA21 on the
+prior bar followed by a reclaim of EMA21 on the current bar ("buy the dip
+in an uptrend," symmetric for downtrends). Gated to genuinely trending
+regimes only (`strong_bull_trend`/`weak_bull_trend`/`strong_bear_trend`).
+
+**Result: NOT VALIDATED.** Full period (38 trades): 31.6% win rate,
+expectancy **-0.053R** — already net negative before any held-out split.
+In-sample alone (31 trades): -0.032R. Held-out (most recent 365 days, 7
+trades): -0.143R. Unlike Breakout's sign-flip, Pullback is consistently
+negative across all three slices — arguably a clearer signal than
+Breakout's, since it isn't just a most-recent-year phenomenon. 32 of 38
+trades landed in `weak_bull_trend` (-0.062R, the dominant bucket); the
+other two regime buckets have only 3 trades each, too few to read
+anything into individually. Held-out sample (7 trades) is below this
+project's own reliability bar, but its direction agrees with the larger
+in-sample slice, so this isn't just small-sample noise.
+
+Kept in the codebase (not deleted), not registered in
+`strategies/registry.py` or exposed on the frontend — see
+`strategies/pullback.py`'s own docstring for candidate revision
+directions (a minimum ATR-scaled pullback depth instead of "any EMA
+touch," or multi-bar reclaim confirmation instead of a single-bar cross).
+
 ## Architecture philosophy
 Deterministic core, LLM synthesis layer (Option 3 from planning discussion),
 evolving toward a proper multi-agent system (Option 2 / LangGraph-style)
