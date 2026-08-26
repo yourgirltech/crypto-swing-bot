@@ -7,11 +7,40 @@ Why this exists: Bybit's public API is geo-blocked from this machine
 public market-data API is used here for BACKTESTING historical data
 only. Bybit remains the documented execution exchange per docs/.
 No API key required — this hits OKX's public candles endpoint.
+
+Milestone 6: every failed attempt inside the retry loop below is logged
+to `retry_events` (db.repository.record_retry_event) for the System
+Health page — best-effort, via `_log_retry_event()`, which swallows any
+error of its own. Logging a retry must never be able to break the actual
+retry it's trying to record.
 """
 
 import time
 import requests
 import pandas as pd
+
+
+def _log_retry_event(request_desc: str, attempt_number: int, max_attempts: int,
+                      delay_seconds: float, exc: Exception) -> None:
+    """
+    Best-effort persistence of one retry attempt. Deliberately swallows
+    every exception of its own (including "DB isn't reachable") -- a
+    logging failure must never break the actual data-fetching retry it's
+    trying to record. Imports are local so importing okx_client.py itself
+    never requires the DB layer to be importable/configured.
+    """
+    try:
+        from db.session import get_session
+        from db.repository import record_retry_event
+        with get_session() as session:
+            record_retry_event(
+                session, source="okx", request_desc=request_desc,
+                attempt_number=attempt_number, max_attempts=max_attempts,
+                delay_seconds=delay_seconds,
+                exception_type=type(exc).__name__, exception_message=str(exc),
+            )
+    except Exception:
+        pass
 
 BASE_URL = "https://www.okx.com"
 
@@ -69,6 +98,7 @@ class OKXClient:
             params["before"] = start_ms  # OKX convention: "before" = records newer than ts
 
         max_retries = 4
+        request_desc = f"GET klines {symbol} {interval}"
         for attempt in range(max_retries):
             try:
                 resp = requests.get(url, params=params, timeout=15)
@@ -77,8 +107,10 @@ class OKXClient:
                 break
             except (requests.exceptions.RequestException,) as exc:
                 if attempt == max_retries - 1:
+                    _log_retry_event(request_desc, attempt + 1, max_retries, 0.0, exc)
                     raise
                 backoff = 2 ** attempt  # 1s, 2s, 4s
+                _log_retry_event(request_desc, attempt + 1, max_retries, backoff, exc)
                 time.sleep(backoff)
 
         if payload.get("code") != "0":

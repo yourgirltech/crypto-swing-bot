@@ -194,6 +194,19 @@ class RiskStatusOut(BaseModel):
     correlated_exposure: List[CorrelatedGroupExposureOut]
 
 
+class RetryEventOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    occurred_at: datetime
+    source: str
+    request_desc: str
+    attempt_number: int
+    max_attempts: int
+    delay_seconds: float
+    exception_type: str
+    exception_message: str
+
+
 class SystemHealthOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -202,7 +215,18 @@ class SystemHealthOut(BaseModel):
     latest_candle_time: Optional[datetime] = None
     latest_signal_time: Optional[datetime] = None
     configured_poll_interval_seconds: int
-    # Explicitly False, not omitted -- see api/routes/system.py's docstring
-    # for why these two are genuinely untracked, not just unpopulated.
+    # True now that data/okx_client.py and paper_trading/engine.py actually
+    # write to retry_events/engine_heartbeats -- see api/routes/system.py.
     retry_events_tracked: bool
     paper_engine_heartbeat_tracked: bool
+
+    recent_retry_events: List[RetryEventOut] = []
+    retry_count_recent: int
+    retry_lookback_minutes: int
+    retry_elevated_threshold: int
+    retry_health: str  # "clean" | "elevated"
+
+    paper_engine_status: str  # "running" | "stale" | "not_running"
+    paper_engine_detail: str
+    latest_heartbeat_at: Optional[datetime] = None
+    heartbeat_stale_threshold_minutes: float

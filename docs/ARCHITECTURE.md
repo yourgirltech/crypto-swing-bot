@@ -526,6 +526,71 @@ stored review exists for the latest signal, and System Health's real
 green connectivity dots alongside its honest amber "not tracked"
 indicators.
 
+## Real retry/heartbeat tracking for System Health (follow-up fix)
+
+The two hardcoded-`False` System Health fields above (`retry_events_tracked`,
+`paper_engine_heartbeat_tracked`) were a genuine, correctly-surfaced gap at
+the time — but both are now closed with real, persisted signal instead of
+prose caveats.
+
+**Two new tables** (`db/models.py`, migration
+`b958ebd1a9d1_add_retry_events_and_engine_heartbeats_`):
+- `retry_events` — one row per retry attempt: `occurred_at`, `source`
+  (`"okx"`), `request_desc`, `attempt_number`/`max_attempts`,
+  `delay_seconds` (backoff before the NEXT attempt; `0` on the final,
+  exhausted attempt), `exception_type`, `exception_message`.
+- `engine_heartbeats` — one row per poll cycle: `engine_name`
+  (`"paper_trading"`), `checked_in_at`, `symbol`, `detail`.
+
+**Retry instrumentation** (`data/okx_client.py`): the existing
+exponential-backoff retry loop in `get_klines()` (Milestone 4 reliability
+fix) now calls a `_log_retry_event()` helper on every attempt, success or
+not. That helper lazy-imports `db.session`/`db.repository` (so importing
+`okx_client.py` doesn't itself require a configured DB) and swallows ALL
+exceptions from the logging path itself — a logging failure must never be
+able to break the actual data-fetching retry it's trying to record.
+
+**Heartbeat instrumentation** (`paper_trading/engine.py`): `run_once()`
+writes a heartbeat row as the very FIRST action in the cycle, before any
+fetch or strategy logic. This is deliberate: it means liveness is proven
+even when the rest of the cycle later raises (e.g. during an OKX outage),
+because the write already committed.
+
+**Real, non-fabricated health signals** (`api/routes/system.py`):
+- `retry_health`: `"elevated"` if more than `RETRY_ELEVATED_THRESHOLD` (5)
+  retry events occurred in the last `RETRY_LOOKBACK_MINUTES` (60) minutes,
+  else `"clean"`. A count of recent events, not a guess.
+- `paper_engine_status`: derived from elapsed time since
+  `get_latest_heartbeat()`'s timestamp vs. the configured poll interval
+  (`POLL_INTERVAL_SECONDS` = 900s / 15 min): `"not_running"` if no
+  heartbeat ever exists; `"running"` if the last check-in is within 2x the
+  poll interval (30 min — `HEARTBEAT_STALE_MULTIPLIER`); `"stale"` if
+  older than that but within 24h; `"not_running"` again beyond 24h. The 2x
+  multiplier gives one missed cycle of slack before flagging staleness,
+  rather than flagging on the very first late poll.
+
+**Verified against real activity, not synthetic mocks**: at the time of
+this fix, `www.okx.com` genuinely failed to resolve (a real DNS/network
+outage, confirmed independently via `socket.gethostbyname`) — so the
+retry path was exercised by calling `OKXClient.get_klines()` with zero
+mocking and letting all 4 real attempts fail naturally, logging 4 genuine
+retry events with correct attempt numbers, backoff delays (1s/2s/4s/0s),
+and exception details. All three `paper_engine_status` branches were
+confirmed to compute correctly: `"running"` from a real fresh heartbeat,
+`"not_running"` from an empty table, and `"stale"` by temporarily
+isolating a synthetic 35-minutes-old row as the latest (the genuinely
+fresh row was briefly removed to test this branch in isolation, then a
+real `run_once()` call was made again afterward to restore an authentic
+"running" state — no synthetic data was left in the DB).
+
+The System Health page (`frontend/src/app/system-health/page.tsx`) now
+renders a "Paper Trading Engine" panel (status dot + precise detail
+text + last-checked-in timestamp) and an "OKX Retry Health" panel (health
+verdict + a table of the last 20 real retry events), replacing the old
+"Honest Gaps — Not Tracked Yet" panel entirely — both are confirmed live
+via screenshot showing real data (16 genuine retry events from the OKX
+outage above, a "running" heartbeat from ~6 minutes prior).
+
 ## Architecture philosophy
 Deterministic core, LLM synthesis layer (Option 3 from planning discussion),
 evolving toward a proper multi-agent system (Option 2 / LangGraph-style)

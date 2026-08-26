@@ -53,10 +53,11 @@ from db.models import Asset, HumanDecision, PaperTrade, Signal
 from db.repository import (
     build_portfolio_state, close_paper_trade, create_paper_trade,
     get_open_paper_trade, get_or_create_asset, has_signal_for_candle,
-    record_human_decision, save_candles, save_signal,
+    record_heartbeat, record_human_decision, save_candles, save_signal,
 )
 
 DATA_SOURCE = "okx"
+ENGINE_NAME = "paper_trading"  # db.models.EngineHeartbeat.engine_name -- see System Health page
 POLL_INTERVAL_SECONDS = 900  # 15 min -- see module docstring for why polling, not WebSocket
 HISTORY_DAYS = 120  # plenty of warmup for indicators/structure; cheap to refetch each poll via OKXClient's existing retry logic
 REFERENCE_BACKTEST_REFRESH = timedelta(hours=24)  # how often to refresh the backtested-stats context below
@@ -116,6 +117,13 @@ def _get_reference_stats(symbol: str, strategy) -> tuple:
 
 
 def run_once(symbol: str) -> None:
+    # Recorded FIRST, before any fetch/logic -- proof of liveness for the
+    # System Health page even if this cycle later raises. A cycle that
+    # errors out still proves the process was alive and attempting work
+    # at this timestamp, which is the actual thing "is it running" asks.
+    with get_session() as session:
+        record_heartbeat(session, ENGINE_NAME, symbol=symbol, detail="poll cycle started")
+
     strategy = TrendContinuationBOS()
     backtest_summary, regime_breakdown = _get_reference_stats(symbol, strategy)
 
