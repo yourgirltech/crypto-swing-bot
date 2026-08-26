@@ -8,12 +8,12 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 
 import pandas as pd
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from db.models import (
-    Asset, BacktestRun, BacktestTrade, Candle, HumanDecision, PaperTrade,
-    PaperTradeStatus, Signal, SignalStatus,
+    Asset, BacktestRun, BacktestTrade, Candle, EngineHeartbeat, HumanDecision, PaperTrade,
+    PaperTradeStatus, RetryEvent, Signal, SignalStatus,
 )
 from backtest.backtest_engine import Trade
 from proposals.trade_proposal import TradeProposal
@@ -256,4 +256,47 @@ def build_portfolio_state(session: Session, account_baseline: float) -> Portfoli
     return PortfolioState(
         account_equity=equity, peak_equity=peak_equity, open_positions=open_positions,
         daily_pnl_pct=daily_pnl_pct, weekly_pnl_pct=weekly_pnl_pct,
+    )
+
+
+def record_retry_event(session: Session, source: str, request_desc: str, attempt_number: int,
+                        max_attempts: int, delay_seconds: float, exception_type: str,
+                        exception_message: str) -> RetryEvent:
+    """Called from data/okx_client.py's retry loop -- see db/models.py's RetryEvent docstring."""
+    event = RetryEvent(
+        source=source, request_desc=request_desc, attempt_number=attempt_number,
+        max_attempts=max_attempts, delay_seconds=delay_seconds,
+        exception_type=exception_type, exception_message=exception_message[:2000],
+    )
+    session.add(event)
+    session.flush()
+    return event
+
+
+def list_recent_retry_events(session: Session, limit: int = 20) -> List[RetryEvent]:
+    return list(session.scalars(
+        select(RetryEvent).order_by(RetryEvent.occurred_at.desc()).limit(limit)
+    ).all())
+
+
+def count_retry_events_since(session: Session, since: datetime) -> int:
+    return session.scalar(
+        select(func.count()).select_from(RetryEvent).where(RetryEvent.occurred_at >= since)
+    ) or 0
+
+
+def record_heartbeat(session: Session, engine_name: str, symbol: Optional[str] = None,
+                      detail: Optional[str] = None) -> EngineHeartbeat:
+    """Called from paper_trading/engine.py's run_once() -- see db/models.py's EngineHeartbeat docstring."""
+    hb = EngineHeartbeat(engine_name=engine_name, symbol=symbol, detail=detail)
+    session.add(hb)
+    session.flush()
+    return hb
+
+
+def get_latest_heartbeat(session: Session, engine_name: str) -> Optional[EngineHeartbeat]:
+    return session.scalar(
+        select(EngineHeartbeat)
+        .where(EngineHeartbeat.engine_name == engine_name)
+        .order_by(EngineHeartbeat.checked_in_at.desc())
     )

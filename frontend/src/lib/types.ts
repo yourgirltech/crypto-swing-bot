@@ -179,4 +179,26 @@ export interface SystemHealth {
   configured_poll_interval_seconds: number;
   retry_events_tracked: boolean;
   paper_engine_heartbeat_tracked: boolean;
+
+  recent_retry_events: RetryEvent[];
+  retry_count_recent: number;
+  retry_lookback_minutes: number;
+  retry_elevated_threshold: number;
+  retry_health: "clean" | "elevated";
+
+  paper_engine_status: "running" | "stale" | "not_running";
+  paper_engine_detail: string;
+  latest_heartbeat_at: string | null;
+  heartbeat_stale_threshold_minutes: number;
+}
+
+export interface RetryEvent {
+  occurred_at: string;
+  source: string;
+  request_desc: string;
+  attempt_number: number;
+  max_attempts: number;
+  delay_seconds: number;
+  exception_type: string;
+  exception_message: string;
 }

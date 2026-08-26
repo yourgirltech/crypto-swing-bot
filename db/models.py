@@ -30,6 +30,10 @@ Design notes (see conversation history / docs for full reasoning):
   `backtest_trades` — this is exactly the "different fields (fills, fees,
   order refs)" case anticipated when `backtest_trades` was named to avoid
   a future clash.
+- `retry_events`/`engine_heartbeats` (Milestone 6) exist specifically so
+  the System Health page can report genuine retry/liveness signals
+  instead of hardcoded placeholders — see okx_client.py and
+  paper_trading/engine.py for where they're actually written.
 """
 
 import enum
@@ -273,3 +277,44 @@ class PaperTrade(Base):
 
     signal: Mapped["Signal"] = relationship(back_populates="paper_trade")
     asset: Mapped["Asset"] = relationship()
+
+
+class RetryEvent(Base):
+    """
+    Milestone 6 (System Health instrumentation): one row per failed HTTP
+    attempt inside data/okx_client.py's retry-with-backoff loop (the
+    Milestone 0 reliability fix) -- whether or not that attempt was
+    followed by another retry or a final raise (`attempt_number ==
+    max_attempts` on a row means it was the last try). Logged best-effort
+    from okx_client.py itself: a logging failure here must never break the
+    actual data fetch it's trying to record, so the call site wraps this
+    in its own try/except that swallows everything.
+    """
+    __tablename__ = "retry_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    occurred_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    source: Mapped[str] = mapped_column(String(20), nullable=False)  # "okx"
+    request_desc: Mapped[str] = mapped_column(String(200), nullable=False)  # e.g. "GET klines BTCUSDT 240"
+    attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)  # 1-indexed
+    max_attempts: Mapped[int] = mapped_column(Integer, nullable=False)
+    delay_seconds: Mapped[float] = mapped_column(Float, nullable=False)  # backoff before the NEXT attempt (0 on the final, exhausted attempt)
+    exception_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    exception_message: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class EngineHeartbeat(Base):
+    """
+    Milestone 6 (System Health instrumentation): one row per poll cycle of
+    a long-running engine (currently just paper_trading/engine.py's
+    run_once()) -- proof of liveness, written at the START of the cycle
+    (before any fetch/logic) so even a cycle that later errors still
+    proves the process was alive and attempting work at `checked_in_at`.
+    """
+    __tablename__ = "engine_heartbeats"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    engine_name: Mapped[str] = mapped_column(String(50), nullable=False)  # "paper_trading"
+    checked_in_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    symbol: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
