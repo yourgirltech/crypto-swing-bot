@@ -606,6 +606,61 @@ verdict + a table of the last 20 real retry events), replacing the old
 via screenshot showing real data (16 genuine retry events from the OKX
 outage above, a "running" heartbeat from ~6 minutes prior).
 
+## Additional strategy modules (Milestone 7)
+
+Per MASTER_PLAN.md Milestone 7: breakout, pullback, mean-reversion, and
+range-trading strategies, each implemented against `strategies/base.py`'s
+`Strategy` ABC and independently backtested + held-out validated —
+nothing assumed profitable until proven, same bar as
+`TrendContinuationBOS`'s EMA21 filter.
+
+**New infrastructure**: `db.repository.get_candles()` loads already-
+persisted candle history back into a DataFrame, so this milestone's
+backtesting runs entirely off the ~5yr of BTCUSDT 4H history already in
+Postgres (from prior milestones' polls/runs) rather than depending on
+live OKX access. `backtest/validate_milestone7.py` is the reusable
+validation runner: it runs ONE full-history backtest per strategy (so
+every indicator gets proper warmup), then splits the resulting CLOSED
+TRADES by `entry_time` into in-sample (everything before the most recent
+365 days) and held-out (the most recent 365 days) — the held-out group's
+equity curve is replayed fresh from `starting_balance` over just its own
+trades, not sliced out of the full 5yr curve, so its drawdown reflects
+"if this were the only trading you'd done" rather than a snapshot shaped
+by years of prior trades. A strategy is only reported "validated" if the
+held-out group shows genuine positive expectancy with at least 5 trades.
+
+**Breakout** (`strategies/breakout.py`) — Donchian-channel break of the
+prior 20-bar range (current bar's own high/low excluded from the channel,
+so it's a genuine break of the PRIOR range) with an ATR-expansion
+conviction filter, confirmed only by rejecting RSI-extreme entries (no
+regime gate — a breakout is exactly the mechanism by which `sideways`
+transitions into a trend, so excluding `sideways` would exclude the
+strategy's own reason for existing). Deliberately independent of the
+swing/BOS machinery `TrendContinuationBOS` uses — it fires on the range→
+trend transition itself, not on confirmation of an already-established
+trend.
+
+**Result: NOT VALIDATED.** Full period (BTCUSDT, 5yr 4H, 126 trades):
+40.5% win rate, +0.214R expectancy. In-sample alone (everything before
+the most recent 365 days, 99 trades): +0.303R — looks like a real edge.
+Held-out (most recent 365 days, genuine out-of-sample, 27 trades): win
+rate drops to 29.6%, expectancy **flips to -0.111R**. Unlike the EMA21
+filter (which stayed negative in the same direction both in-sample and
+held-out — a weakened-but-consistent signal), this is a full sign flip:
+the full-period/in-sample positive number was substantially an artifact
+of the specific years backtested, not a property that generalizes
+forward. Regime breakdown shows most entries (62/126) landing in the
+`sideways` classification at entry time — mechanically expected, since a
+fresh range breakout is often still classified `sideways` by the
+20-bar-EMA-slope regime classifier before the slope catches up.
+
+Kept in the codebase (not deleted) as a base for future iteration, same
+"pause, don't delete" precedent as ETH — see `strategies/breakout.py`'s
+own docstring for candidate revision directions (requiring
+`TrendState.RANGE` specifically, or excluding the worst-performing
+`strong_bear_trend` bucket). Not registered in `strategies/registry.py`
+or exposed on the frontend Strategies page while unvalidated.
+
 ## Architecture philosophy
 Deterministic core, LLM synthesis layer (Option 3 from planning discussion),
 evolving toward a proper multi-agent system (Option 2 / LangGraph-style)
