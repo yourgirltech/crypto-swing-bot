@@ -55,13 +55,23 @@ this strategy): 7 trades, 28.6% win rate, expectancy -0.143R.
 
 Unlike Breakout (which looked profitable in-sample and only failed on the
 held-out slice -- a sign flip), Pullback is consistently negative across
-ALL three slices -- full period, in-sample, and held-out. That
-consistency is actually a clearer signal than Breakout's result: this
-entry definition doesn't show an edge anywhere in the data, not just in
-the most recent year. Held-out sample is very small (7 trades, below
-this file's own reliability bar) so don't read too much into -0.143R
-specifically, but the direction agrees with both larger slices, so this
-isn't just small-sample noise flipping a sign.
+ALL three slices -- full period, in-sample, and held-out. This is a
+DIFFERENT kind of failure than Breakout's: Breakout's in-sample edge
+didn't generalize forward (overfitting to the years backtested); Pullback
+never had an edge to begin with, in-sample OR held-out, which points at
+the entry logic itself lacking edge here rather than a generalization
+failure. Held-out sample is very small (7 trades, below this file's own
+reliability bar) so don't read too much into -0.143R specifically, but
+the direction agrees with both larger slices, so this isn't just
+small-sample noise flipping a sign.
+
+CONFIDENCE CAVEAT: the full-period sample itself is small (38 trades
+total, vs. Breakout's 126) -- roughly a third the evidence. The
+"lacks edge" conclusion above is directionally consistent across all
+three slices, which is meaningful, but with this few total trades treat
+it as a reasonable working conclusion, not a statistically strong one --
+a genuinely different pullback definition could still turn up an edge
+this sample is simply too small to rule out.
 
 Regime breakdown: 32 of 38 trades landed in weak_bull_trend (-0.062R,
 the dominant and clearly negative bucket); strong_bull_trend (3 trades,
