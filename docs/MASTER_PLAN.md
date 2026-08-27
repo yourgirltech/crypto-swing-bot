@@ -240,25 +240,48 @@ history exists, rather than staying permanently untestable.
   the system before there's a real case for it, even when the case can't
   be checked instantly and requires patiently collecting evidence first.
 
-**Milestone 10 (PREREQUISITE MET, 2026-08-26 — scoped, nothing wired in
-yet):** Market scanner ranking multiple assets by signal quality — still
-gated by strategy → risk → portfolio validation before anything becomes
-a proposal. Previously assessed as having no real prerequisite (one
-active asset, nothing to rank). That changed: testing the four shelved
-Milestone 7 strategies against ETHUSDT (same rigor — full period,
-in-sample, held-out) found **Breakout genuinely held-out validates on
-ETH** (held-out: 22 trades, +0.091R, sign held from in-sample) — a real,
-evidenced second asset/strategy pair, independent of `TrendContinuationBOS`'s
-BTC validation. See `strategies/breakout.py`'s docstring and
-docs/ARCHITECTURE.md's Milestone 10 section for the full numbers and an
-explicit scope of what wiring this in would require: today's
-`MARKET.pairs` has no per-symbol strategy concept, `paper_trading/
-engine.py` hardcodes one strategy for every symbol, and reactivating ETH
-for any strategy triggers a mandatory re-derivation of
-`max_portfolio_exposure_pct`/`max_correlated_exposure_pct` (currently 85%
-only because exactly one position is ever open at a time — see
-`config.py`'s own comments). Nothing has been built against this yet —
-scoped, not started.
+**Milestone 10 (PREREQUISITE MET AND LIVE IN PAPER TRADING, 2026-08-27):**
+Market scanner ranking multiple assets by signal quality — still gated by
+strategy → risk → portfolio validation before anything becomes a
+proposal. Previously assessed as having no real prerequisite (one active
+asset, nothing to rank); that changed when Breakout was found to
+genuinely held-out validate on ETHUSDT (held-out: 22 trades, +0.091R,
+sign held from in-sample) — a real, evidenced second asset/strategy pair,
+independent of `TrendContinuationBOS`'s BTC validation.
+
+Before treating that as a go-live decision rather than just "validated,"
+three things were checked with real data, not assumed:
+1. Built `backtest/combined_portfolio_backtest.py` — every prior backtest
+   tracked only one open position at a time; this runs both strategies as
+   ONE real portfolio (shared balance, concurrent positions) across their
+   aligned 5yr history. Found 49 genuine concurrent entries; uncapped,
+   combined notional naturally reached up to 141% of equity — confirming
+   `max_leverage=1.0` alone (a per-trade check) would NOT have caught a
+   real over-100%-of-equity combined exposure scenario.
+2. Re-derived `max_portfolio_exposure_pct`/`max_correlated_exposure_pct`
+   85% → 90% using that real data (natural cluster ceiling ~88.90%, then
+   a jump to 107.61%/141.45%, nothing in between) — same "find the gap"
+   methodology as `max_position_size_pct`'s own Milestone 4 derivation.
+   Re-verified both single-asset results stayed byte-identical after the
+   change (the cap only affects concurrent sizing).
+3. Built the real per-symbol-strategy mapping (`strategies/registry.py`'s
+   `STRATEGY_FOR_SYMBOL`) that `paper_trading/engine.py` and `main.py`
+   both import — replacing the old hardcoded single-strategy assumption
+   in both files.
+
+**Now live**: `MARKET.pairs` is `["BTCUSDT", "ETHUSDT"]`, each running its
+own assigned strategy (`TrendContinuationBOS` for BTC, `Breakout` for
+ETH). `strategies/registry.py` and the frontend Strategies page correctly
+show both with their own real, distinct backtested stats (verified via
+screenshot — no shared/duplicated numbers). The paper trading engine was
+restarted and its first poll cycle confirmed evaluating both symbols
+independently, each against its own strategy, with real OKX data.
+
+Since this is paper trading — no real capital at stake — **this
+activation itself IS the real-world validation period Milestone 10
+needs, not a separate step still owed.** Any live-trading discussion for
+ETH/Breakout is a distinct, later decision, gated on how this paper
+period actually performs.
 — Python: batch processing across symbols efficiently.
 
 **Milestone 11:** On-chain + macro context layers (Phase 3 from the
