@@ -1061,71 +1061,97 @@ with worse trade outcomes — for real, on this project's own trade
 history, rather than staying permanently unable to test it because the
 public API's retroactive window is too short.
 
-## Milestone 10 — prerequisite now met, but NOTHING wired in yet (scoping only)
+## Milestone 10 — LIVE in paper trading (2026-08-27)
 
 Milestone 10 (a market scanner ranking multiple assets by signal quality)
 was previously assessed as having no real prerequisite: one active asset,
-one validated strategy, nothing to rank. That assessment has changed —
-**Breakout is now a real, held-out-validated strategy on ETHUSDT** (see
-above), independent of `TrendContinuationBOS`'s BTC validation. A second,
-genuinely evidenced asset/strategy pair exists.
+one validated strategy, nothing to rank. That changed when Breakout was
+found to genuinely held-out validate on ETHUSDT, independent of
+`TrendContinuationBOS`'s BTC validation — a second, real evidenced
+asset/strategy pair. This section originally scoped what wiring that in
+would require, before any of it was built; it's kept below as the record
+of that scoping, followed by what actually shipped.
 
-**This section is scoping only — no code has been wired in.** Presented
-before any implementation, per this project's own evidence-first
-standard (same as Milestones 8/9): confirm the prerequisite is real
-before building on top of it, then confirm the actual cost/blockers
-before touching shared/live code.
+**Pre-go-live checks, done with real data before touching anything
+live** (not just "validated" — the actual concurrent-position scenario
+had never been tested):
+1. Built `backtest/combined_portfolio_backtest.py` — every backtest
+   before this tracked only ONE open position at a time; this runs
+   TrendContinuationBOS-on-BTC concurrent with Breakout-on-ETH as ONE
+   real portfolio (shared balance, both positions tracked
+   simultaneously, sized against each other via the real
+   `size_position()` call). Found 49 genuine concurrent entries over
+   5yr; uncapped, combined notional naturally reached up to 141% of
+   equity — confirming `max_leverage=1.0` (a per-trade-only check) would
+   NOT have caught a real over-100%-of-equity combined scenario on its
+   own.
+2. Re-derived `max_portfolio_exposure_pct`/`max_correlated_exposure_pct`
+   85% → 90% using that real uncapped data (natural cluster ceiling
+   ~88.90%, then a jump to 107.61%/141.45%, nothing in between — same
+   "find the gap" methodology as `max_position_size_pct`'s own Milestone
+   4 derivation, held with the same small-sample caveat). Re-verified
+   after the change: only 2 of 49 concurrent entries clip now (both
+   exactly at 90%, matching the two real >100% outliers), and BOTH
+   single-asset results (`TrendContinuationBOS`-on-BTC,
+   `Breakout`-on-ETH) confirmed BYTE-IDENTICAL to pre-change via a
+   git-stash before/after diff.
 
-**What today's architecture does NOT support**: `MARKET.pairs` is a flat
-symbol list with no per-symbol strategy association. `paper_trading/
-engine.py`'s `run_once(symbol)` hardcodes `strategy = TrendContinuationBOS()`
-internally — the strategy isn't a parameter today, so the current code
-cannot run a different strategy per symbol without a real change.
-`main.py`'s `run_for_symbol()` has the identical hardcoding. Simply adding
-`"ETHUSDT"` to `MARKET.pairs` today would be actively wrong — it would
-silently run `TrendContinuationBOS` (not `Breakout`) against ETH, the
-exact combination already proven not to work there.
+**What was originally scoped, and what actually got built (all done)**:
+- `strategies/registry.py` now owns `STRATEGY_FOR_SYMBOL` (`BTCUSDT` →
+  `TrendContinuationBOS`, `ETHUSDT` → `Breakout`) as the single source of
+  truth — `paper_trading/engine.py` and `main.py` both import it rather
+  than each hardcoding their own single strategy (the old bug: both
+  files hardcoded `strategy = TrendContinuationBOS()` internally,
+  meaning simply adding `"ETHUSDT"` to `MARKET.pairs` before this fix
+  would have silently run `TrendContinuationBOS` — not `Breakout` —
+  against ETH, the exact combination already proven not to work there).
+- `paper_trading/engine.py`'s `run_once(symbol)` → `run_once(symbol,
+  strategy)`, `main()`'s loop resolves the right strategy per symbol via
+  the registry.
+- `_get_reference_stats`'s cache key widened from `{symbol: ...}` to
+  `{(symbol, strategy.name): ...}` — prevents silently returning the
+  wrong strategy's backtested stats now that a symbol can map to more
+  than one strategy over time.
+- `strategies/registry.py`'s `list_strategies()` rewritten to return one
+  `StrategyInfo` per DISTINCT strategy actually assigned to the given
+  symbols (grouped by strategy), not "the one strategy, applied to every
+  symbol" (valid when there was exactly one strategy in the codebase;
+  stopped being valid the moment a second pairing existed).
+- `main.py` re-run to persist a REAL `backtest_run`/`backtest_trades` for
+  Breakout-on-ETHUSDT (`backtest_run id=10`) — it hadn't existed before
+  (the earlier ETH validation only ran in-memory via
+  `validate_milestone7.py`), and the frontend Strategies page reads its
+  "latest backtested performance" panel from persisted `backtest_runs`
+  by symbol, not from this registry.
+- **Verified via screenshot**: the frontend Strategies page shows two
+  separate panels — `TREND_CONTINUATION_BOS` (BTCUSDT, its own real
+  params, 126 trades/37.3%/+0.12R) and `BREAKOUT` (ETHUSDT, its own real,
+  different params, 126 trades/39.7%/+0.19R) — no shared or duplicated
+  numbers between them.
+- `MARKET.pairs` is now `["BTCUSDT", "ETHUSDT"]`.
+- The paper trading engine was restarted and its first poll cycle
+  confirmed evaluating both symbols independently: BTC's heartbeat fired
+  first, then ETH's, each fetching its own current OKX data and running
+  its own assigned strategy (BTC found no new setup on the latest
+  candle; ETH found no new setup either — both clean, expected outcomes,
+  not errors). `PaperTrade #6` (BTC, still open from earlier) confirmed
+  unaffected throughout (`stop_price`/`target_price` identical across
+  every checkpoint).
 
-**What already supports this, no schema change needed**: `Signal.
+**What already supported this with no schema change needed**: `Signal.
 setup_type` already stores which strategy produced each signal (it's
-`TradeProposal.setup_type`, which is `strategy.name`). `has_signal_for_
+`TradeProposal.setup_type`, i.e. `strategy.name`). `has_signal_for_
 candle()`/`get_open_paper_trade()` are already scoped by `asset_id`, not
 global, so two different strategies producing signals for two different
-assets don't collide. `build_portfolio_state()` already aggregates real
-open positions across ALL assets (not hardcoded to one) — the portfolio-
-level risk math itself already handles a multi-asset book.
+assets never collide. `build_portfolio_state()` already aggregated real
+open positions across ALL assets — the portfolio-level risk math itself
+already handled a multi-asset book before any of this work.
 
-**What would actually be required**:
-1. Replace `MARKET.pairs: List[str]` with a real (symbol, strategy)
-   pairing structure, and promote something like
-   `backtest/validate_milestone7.py`'s `STRATEGIES` name→class lookup
-   into a shared registry rather than a test-runner-local dict.
-2. Widen `run_once(symbol)` → `run_once(symbol, strategy)` in
-   `paper_trading/engine.py`, and its `main()` loop to iterate
-   (symbol, strategy) pairs instead of symbols alone.
-3. Widen `_get_reference_stats`'s cache key from `{symbol: ...}` to
-   `{(symbol, strategy.name): ...}` — currently keyed by symbol alone,
-   which would silently return the WRONG strategy's backtested stats if
-   the same symbol were ever evaluated under two strategies.
-4. `strategies/registry.py` needs to become a real per-(strategy, symbol)
-   capability map instead of its current single hardcoded
-   `TrendContinuationBOS` entry, so the frontend Strategies page reflects
-   reality instead of assuming one strategy covers all of `MARKET.pairs`.
-5. **A mandatory risk-config re-derivation, flagged per the standing "no
-   config/config.py risk-value changes without flagging first" rule, NOT
-   done here**: `max_portfolio_exposure_pct`/`max_correlated_exposure_pct`
-   are currently 85% — identical to `max_position_size_pct` — ONLY
-   because exactly one position is ever open at a time today (see
-   `config.py`'s own comments, dated 2026-08-25). The moment ETH is
-   reactivated for ANY strategy, a second concurrent open position
-   (BTC/BOS + ETH/Breakout) becomes real for the first time, and that
-   85% coincidence can no longer be assumed to hold — it must be
-   independently re-derived against real two-asset combined-exposure
-   data before being trusted, exactly as `config.py` already warns.
-
-None of this has been built. This section exists so the next session (or
-the next message in this one) starts from an accurate map of the actual
-work, not from "just add ETHUSDT to the pairs list."
+**Since this is paper trading — no real capital at stake — this
+activation itself IS the real-world validation period Milestone 10
+needs, not a separate step still owed.** Any live-trading discussion for
+ETH/Breakout is a distinct, later decision, gated on how this paper
+period actually performs, not on anything in this section.
 
 ## Architecture philosophy
 Deterministic core, LLM synthesis layer (Option 3 from planning discussion),

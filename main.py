@@ -27,7 +27,7 @@ sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 from config.config import MARKET, RISK, BACKTEST
 from data.okx_client import OKXClient
 from backtest.backtest_engine import run_backtest
-from strategies.trend_continuation_bos import TrendContinuationBOS
+from strategies.registry import STRATEGY_FOR_SYMBOL, strategy_parameters
 from proposals.trade_proposal import build_proposal
 from reporting.plain_language_summary import full_report
 from db.session import get_session
@@ -56,14 +56,14 @@ def run_for_symbol(symbol: str):
         new_candles = save_candles(session, asset, MARKET.primary_timeframe, DATA_SOURCE, df)
     print(f"Persisted {new_candles} new candles to Postgres (existing rows skipped).")
 
-    strategy = TrendContinuationBOS()
+    strategy = STRATEGY_FOR_SYMBOL[symbol]
 
     bt = run_backtest(
         df, strategy, RISK, symbol,
         starting_balance=BACKTEST.starting_balance,
     )
     summary = bt.summary()
-    print("\nBacktest results (trend-continuation BOS setup):")
+    print(f"\nBacktest results ({strategy.name} setup):")
     for k, v in summary.items():
         print(f"  {k}: {v}")
 
@@ -82,15 +82,11 @@ def run_for_symbol(symbol: str):
                 "risk_per_trade_pct": RISK.risk_per_trade_pct,
                 "max_position_size_pct": RISK.max_position_size_pct,
                 "starting_balance": BACKTEST.starting_balance,
-                "atr_stop_mult": strategy.atr_stop_mult,
-                "reward_risk": strategy.reward_risk,
-                "swing_lookback": strategy.swing_lookback,
-                "rsi_extreme": list(strategy.rsi_extreme),
-                # weak_bull_trend EMA21 confirmation is now baked into
-                # TrendContinuationBOS.confirm_entry (Milestone 3) rather
-                # than an optional toggle -- key/value kept as before so
-                # historical runs stay comparable.
-                "entry_filter": "weak_bull_trend_ema_filter",
+                # Per-strategy params from the same helper strategies/registry.py
+                # uses for the frontend Strategies page -- one source of truth
+                # for "what are this strategy's actual instantiated parameters,"
+                # not duplicated/hardcoded per-strategy here.
+                **strategy_parameters(strategy),
             },
         )
         n_trades = save_backtest_trades(session, run, bt.trades)

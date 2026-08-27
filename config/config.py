@@ -89,17 +89,23 @@ class RiskConfig:
 
 @dataclass
 class MarketConfig:
-    # ETHUSDT is PAUSED, not removed, as of the 2026-08-24 5-year backtest
-    # review: the trend-continuation BOS setup lost money on ETH overall
-    # (-0.065R expectancy over 138 trades), and critically the losses were
-    # NOT concentrated in one regime (sideways: -0.385R, strong_bear_trend:
-    # -0.400R) — they showed up across regimes. That pattern points to the
-    # entry logic itself not suiting ETH's price behavior, not just a
-    # regime-gating problem that a filter could fix. data/okx_client.py and
-    # the rest of the pipeline still support ETH so it can be revisited
-    # with different strategy logic later — it's just excluded from the
-    # active backtest/proposal run for now.
-    pairs: List[str] = field(default_factory=lambda: ["BTCUSDT"])
+    # ETHUSDT REACTIVATED 2026-08-26 -- with Breakout, NOT TrendContinuationBOS.
+    # TrendContinuationBOS itself is still net-unprofitable on ETH (-0.059R
+    # over 118 trades as last verified; see strategies/trend_continuation_bos.py
+    # -- losses are NOT uniform across regimes as originally characterized,
+    # weak_bull_trend is actually strongly positive there, see
+    # docs/ARCHITECTURE.md's btc_only_focus note) and is NOT assigned to ETH.
+    # Breakout (Milestone 7, shelved on BTC as overfit) independently held-out
+    # validates on ETH (held-out: 22 trades, +0.091R) -- see
+    # strategies/breakout.py and docs/ARCHITECTURE.md's Milestone 10 section
+    # for the full validation, the combined-portfolio backtest that checked
+    # BTC+ETH concurrent exposure before this reactivation, and the
+    # per-symbol-strategy mapping (strategies/registry.py's
+    # STRATEGY_FOR_SYMBOL) that makes each symbol run its OWN assigned
+    # strategy rather than one strategy applied uniformly. This activation
+    # is paper trading only -- see paper_trading/engine.py; it serves as the
+    # real-world validation period before any live-trading discussion.
+    pairs: List[str] = field(default_factory=lambda: ["BTCUSDT", "ETHUSDT"])
     primary_timeframe: str = "240"    # 4H, Bybit kline interval string (minutes)
     context_timeframe: str = "D"      # Daily, for trend/structure context
     exchange: str = "bybit"
