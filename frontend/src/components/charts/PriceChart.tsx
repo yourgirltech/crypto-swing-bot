@@ -73,7 +73,18 @@ export function PriceChart({ candles, markers }: { candles: Candle[]; markers?: 
 
   return (
     <div className="h-80 w-full">
-      <ResponsiveContainer width="100%" height="100%">
+      {/*
+        minWidth/minHeight matter, not just belt-and-suspenders: Recharts'
+        ResponsiveContainer renders its inner wrapper at a literal
+        width:0;height:0 until a ResizeObserver reports the real measured
+        size of the OUTER container -- on some Next.js hydration timings
+        that observer callback never fires, leaving the chart permanently
+        at 0x0 (no error, just nothing drawn) even though the outer div
+        already has the correct h-80/w-full size. These props put a real
+        floor under the size Recharts starts from, so there's always
+        something to render before/without the observer ever firing.
+      */}
+      <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={320}>
         <ComposedChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
           <CartesianGrid stroke={BORDER} strokeDasharray="0" vertical={false} />
           <XAxis
