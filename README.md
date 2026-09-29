@@ -1,77 +1,100 @@
-# Crypto Swing Trading Bot (Phase 1)
+# Crypto Swing Trading Bot
 
-A capital-preservation-first, swing-timeframe trading bot for Bybit
-(BTC/USDT, ETH/USDT). Full design rationale and phased roadmap in
-[`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — read that first.
+A capital-preservation-first, 4H swing trading system for BTC/USDT and
+ETH/USDT, currently in **paper trading** with mandatory human approval of
+every trade. Full vision and milestone roadmap: [`docs/MASTER_PLAN.md`](docs/MASTER_PLAN.md).
+Implementation detail and every validation result: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 **This bot does not promise fixed returns on a fixed timeline. No honest
-trading system can.** The goal is steady, risk-controlled growth with
-capital preservation as the top priority. Every trade requires human
-approval — nothing executes automatically in this phase.
+trading system can.** Nothing executes without a human saying yes, and no
+real capital is connected yet.
 
-## What's implemented (Phase 1)
+## Status (2026-09-29)
 
-- `data/` — Bybit OHLCV ingestion (public endpoint, no API key needed for historical data)
-- `structure/` — deterministic market structure engine: swing highs/lows,
-  HH/HL/LH/LL trend sequencing, BOS/CHoCH detection, support/resistance
-  zones, equal-high/low liquidity clusters, session/prior-day levels
-- `indicators/` — lean confluence stack: EMA trend filter, RSI, ATR,
-  Bollinger Bands
-- `regime/` — regime classifier (strong bull / weak bull / range /
-  hyperbolic / strong bear / panic recovery), every label traceable to
-  the underlying numbers
-- `backtest/` — walk-forward backtest engine producing real win-rate,
-  expectancy, and drawdown stats — the source of any "chance of profit"
-  figure, never invented
-- `proposals/` — builds a structured trade proposal (entry/stop/target/
-  size + backtested stats) for human review; returns `None` if no valid
-  setup exists rather than forcing one
-- `db/` — PostgreSQL persistence layer (SQLAlchemy models + Alembic
-  migrations): `assets`, `candles`, `backtest_runs`, `backtest_trades`,
-  `signals`. Minimal by design — see `db/models.py`'s module docstring
-  for what's deliberately not built yet (orders, positions, portfolios,
-  etc.) and why.
+| Milestone | State |
+|---|---|
+| 0 - Analysis core (structure, indicators, regime, backtest, proposals) | Done |
+| 1 - Postgres persistence (SQLAlchemy + Alembic) | Done |
+| 2 - Risk engine with veto authority | Done |
+| 3 - Strategy interface | Done |
+| 4 - Paper trading engine (human-approved) | Done, running continuously via `start.cmd` |
+| 5 - Journal + FastAPI | Done |
+| 6 - Next.js dashboard | Done |
+| 7 - Breakout / pullback / mean-reversion / range strategies | Done - none validated on BTC; Breakout validated on ETH |
+| 8 - ML regime classification | Deferred - no evidence it fixes a real failure |
+| 9 - Derivatives filters | Deferred - passive data collection only |
+| 10 - Multi-asset | Live in paper: BTC = TrendContinuationBOS, ETH = Breakout |
+| 11 - On-chain / macro context | Not started - waits on accumulated paper-trading history |
+| 12 - Testnet, then ₦100k live | Not started |
 
-## Setup
+## Layout
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
+- `data/` - OKX market data client (used; Bybit is geo-blocked here) and the original Bybit client
+- `structure/`, `indicators/`, `regime/` - market structure (swings, BOS/CHoCH), EMA/RSI/ATR/BB, regime labels
+- `strategies/` - `Strategy` ABC plus five strategies; `registry.py` maps each symbol to its strategy
+- `risk/` - `risk_engine.py` (veto gate), `position_sizing.py` (sizes down to fit caps), `status.py`
+- `proposals/`, `reporting/` - trade proposal builder and plain-language trade review
+- `backtest/` - walk-forward engine, held-out validation runner, combined BTC+ETH portfolio backtest
+- `paper_trading/engine.py` - polls OKX every 15 min, closed 4H candles only, asks y/n before opening
+- `journal/`, `api/` - journal queries and the read-only FastAPI app (port **8010**)
+- `db/`, `alembic/` - models, repository, migrations
+- `frontend/` - Next.js dashboard (port **3000**)
+- `tests/` - pytest unit tests (risk engine, sizing, live strategies, paper-engine regressions)
+
+## Prerequisites
+
+- Python 3.12+, Node 20+, Docker Desktop
+- **A VPN.** OKX is ISP-blocked on this network (Bybit and Binance are
+  geo-blocked). Without it the engine and `main.py` get no data.
+
+## Setup (once)
+
+```powershell
+python -m venv venv
+venv\Scripts\activate
 pip install -r requirements.txt
 
-# Local Postgres (see docker-compose.yml — host port 5433, not 5432)
-docker compose up -d
+docker compose up -d        # Postgres on host port 5433 (5432 is taken by another project)
 alembic upgrade head
 
-python main.py
+cd frontend; npm install; cd ..
 ```
 
-No API keys are required to run Phase 1 (historical kline data is public).
-If you later add live-account features, set these as environment
-variables — never hardcode them:
+## Run
 
-```bash
-export BYBIT_API_KEY=...
-export BYBIT_API_SECRET=...
-export BYBIT_TESTNET=true
+```powershell
+.\start.cmd              # Postgres + backend :8010 + frontend :3000 + paper trading engine
+.\start.cmd -NoEngine    # same, without the engine
+.\stop.cmd               # stops backend, frontend and engine (Postgres keeps running)
+```
+
+Each server opens in its own window. The **paper engine window is where
+trade approvals appear** (the console beeps). Leave it open for the
+engine to keep running. It restarts itself if the process dies, and a
+proposal waits in that window until you answer it. Anything already
+running is left alone, so re-running `start.cmd` is safe. The backend's
+first start can take 1-2 minutes (slow imports from the OneDrive folder).
+
+- Dashboard: http://localhost:3000
+- API docs: http://localhost:8010/docs
+
+Other entry points:
+
+```powershell
+python main.py                                            # one-shot backtest + current proposal, persisted
+python -m backtest.validate_milestone7 --symbol=ETHUSDT breakout   # full / in-sample / held-out validation
+python -m pytest                                          # unit tests
 ```
 
 ## Configuration
 
-All risk, pair, and strategy parameters live in `config/config.py` — that
-is the single place to adjust account size, risk-per-trade %, pairs,
-timeframes, and indicator periods.
-
-## Roadmap
-
-See `docs/ARCHITECTURE.md` for the full Phase 1-4 plan: strategy modules
-+ human approval loop (Phase 2), on-chain/macro context layers (Phase 3),
-testnet validation and small live capital with an evolving multi-agent
-synthesis layer (Phase 4).
+All risk, pair and strategy parameters live in `config/config.py`. Risk
+limits there were each derived from backtest data (see the comments next
+to each value). Change them deliberately, never to make a trade fit.
 
 ## Explicitly out of scope right now
 
 - Intraday/scalping timeframes
-- High leverage (capped at 1x to start)
-- Unattended live execution
+- Leverage (capped at 1x)
+- Unattended or auto-approved execution
 - Any guaranteed or fixed-timeline return target
