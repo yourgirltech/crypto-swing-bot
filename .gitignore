@@ -15,3 +15,6 @@ frontend/.env*.local
 frontend/*.tsbuildinfo
 frontend/next-env.d.ts
 Thumbs.db
+
+# Local launcher state (scripts/start.ps1)
+.run/
