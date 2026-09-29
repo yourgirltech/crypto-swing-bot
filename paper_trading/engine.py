@@ -174,7 +174,6 @@ def run_once(symbol: str, strategy: Strategy) -> None:
         return
 
     latest_candle_time = df.iloc[-1]["open_time"]
-    latest_bar = df.iloc[-1]
 
     with get_session() as session:
         asset = get_or_create_asset(session, symbol, exchange=MARKET.exchange, category=MARKET.category)
@@ -183,29 +182,61 @@ def run_once(symbol: str, strategy: Strategy) -> None:
         open_trade_id = getattr(get_open_paper_trade(session, asset), "id", None)
 
     if open_trade_id is not None:
-        _check_open_position(symbol, open_trade_id, strategy, latest_bar, latest_candle_time)
+        _check_open_position(symbol, open_trade_id, strategy, df, latest_candle_time)
         return
 
     _check_for_entry(symbol, asset_id, strategy, df, latest_candle_time, backtest_summary, regime_breakdown)
 
 
-def _check_open_position(symbol: str, open_trade_id: int, strategy, latest_bar, latest_candle_time) -> None:
+def _find_exit(strategy, direction: str, entry_price: float, stop_price: float, target_price: float,
+               df, entry_time):
+    """
+    Walks EVERY closed candle after the entry candle, oldest first, and
+    returns (exit_result, exit_bar_time) for the first one that hits stop or
+    target, else (None, None). Mirrors backtest_engine.run_backtest(), which
+    checks exits bar-by-bar from the bar after entry and stamps exit_time
+    with that bar's open_time.
+
+    Checking only the latest candle (the pre-2026-09-29 behavior) silently
+    skipped any stop/target hit while the engine was down or blocked on an
+    approval prompt -- e.g. paper trade #6 sat OPEN for a month across a
+    gap in which nothing re-checked the candles in between.
+    """
+    for bar in df[df["open_time"] > entry_time].itertuples(index=False):
+        bar = bar._asdict()
+        exit_result = strategy.check_exit(direction, entry_price, stop_price, target_price, bar)
+        if exit_result is not None:
+            return exit_result, bar["open_time"]
+    return None, None
+
+
+def _check_open_position(symbol: str, open_trade_id: int, strategy, df, latest_candle_time) -> None:
     with get_session() as session:
         open_trade = session.get(PaperTrade, open_trade_id)
         direction, stop_price, target_price = open_trade.direction, open_trade.stop_price, open_trade.target_price
         proposed_entry_price = open_trade.proposed_entry_price
         entry_fill_price, entry_fee = open_trade.entry_fill_price, open_trade.entry_fee
         position_size, risk_amount = open_trade.position_size, open_trade.risk_amount
+        entry_time = open_trade.entry_time
+
+    if df["open_time"].min() > entry_time:
+        # HISTORY_DAYS no longer reaches back to the entry -- can't prove no
+        # stop/target was hit in the missing stretch, so don't guess.
+        print(f"[{symbol}] Paper trade #{open_trade_id}: fetched history starts after its entry "
+              f"({entry_time}); exit check skipped. Increase HISTORY_DAYS to cover it.")
+        return
 
     # proposed_entry_price (pre-slippage), not entry_fill_price -- check_exit's
     # r_multiple is the "ideal" backtest-style figure (see the print below),
     # matching backtest_engine.Trade.entry_price's same pre-slippage semantics.
     # The REALISTIC r_multiple (post-slippage/fees) is computed separately
     # below from entry_fill_price/exit_fill_price, same as before this change.
-    exit_result = strategy.check_exit(direction, proposed_entry_price, stop_price, target_price, latest_bar)
+    exit_result, exit_time = _find_exit(
+        strategy, direction, proposed_entry_price, stop_price, target_price, df, entry_time,
+    )
     if exit_result is None:
         print(f"[{symbol}] Paper trade #{open_trade_id} still open ({direction}, entry {entry_fill_price:.2f}). "
-              f"No stop/target hit on latest closed candle ({latest_candle_time}).")
+              f"No stop/target hit on any closed candle since entry (through {latest_candle_time}).")
         return
 
     side = _exit_side(direction)
@@ -220,11 +251,11 @@ def _check_open_position(symbol: str, open_trade_id: int, strategy, latest_bar, 
         open_trade = session.get(PaperTrade, open_trade_id)
         close_paper_trade(
             session, open_trade, exit_result, exit_fill_price, exit_fee,
-            latest_candle_time, r_multiple_realistic, pnl_ngn,
+            exit_time, r_multiple_realistic, pnl_ngn,
         )
 
     print(
-        f"[{symbol}] Paper trade #{open_trade_id} CLOSED: {exit_result.outcome.upper()} at "
+        f"[{symbol}] Paper trade #{open_trade_id} CLOSED on the {exit_time} candle: {exit_result.outcome.upper()} at "
         f"{exit_fill_price:.2f} (proposed {exit_result.exit_price:.2f}). "
         f"Ideal R (backtest-style): {exit_result.r_multiple:+.2f}. "
         f"Realistic R (after slippage+fees): {r_multiple_realistic:+.3f}. PnL: NGN {pnl_ngn:,.0f}."
@@ -265,7 +296,9 @@ def _check_for_entry(symbol: str, asset_id: int, strategy, df, latest_candle_tim
     )
     print("\n" + summary + "\n")
 
-    decision_input = input(f"[{symbol}] Approve this trade? (y/n): ").strip().lower()
+    #  rings the console bell -- the engine runs continuously in its own
+    # window (start.cmd), so a pending approval needs to get noticed.
+    decision_input = input(f"[{symbol}] Approve this trade? (y/n): ").strip().lower()
 
     if decision_input == "y":
         side = _entry_side(proposal.direction)
@@ -291,6 +324,13 @@ def _check_for_entry(symbol: str, asset_id: int, strategy, df, latest_candle_tim
 
 
 def main():
+    if not sys.stdin.isatty():
+        # Without a console, input() raises EOFError at the approval prompt:
+        # the signal stays APPROVED-by-risk with no human decision and
+        # has_signal_for_candle() never asks again for that candle. Refuse to
+        # run rather than silently lose approvals.
+        sys.exit("Paper trading engine needs an interactive console for trade approvals -- "
+                 "run it via start.cmd or directly in a terminal, not as a background job.")
     print(f"Paper trading engine starting -- polling every {POLL_INTERVAL_SECONDS}s. Ctrl+C to stop.")
     while True:
         for symbol in MARKET.pairs:
