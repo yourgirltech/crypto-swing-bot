@@ -132,9 +132,15 @@ class OKXClient:
         if not rows:
             return pd.DataFrame(columns=["open_time", "open", "high", "low", "close", "volume", "turnover"])
 
-        # OKX rows: [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm] — take first 6
+        # OKX rows: [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm] — take first 6,
+        # plus confirm. history-candles DOES include the still-forming candle as
+        # its newest row (confirm="0", verified live 2026-09-29) -- kept here as
+        # a `confirmed` column so get_historical_klines() can paginate on the raw
+        # batch size and drop it afterwards. Never filter it out here: the early
+        # `len(df) < batch` break would then fire on the very first batch.
         trimmed = [row[:6] for row in rows]
         df = pd.DataFrame(trimmed, columns=["open_time", "open", "high", "low", "close", "volume"])
+        df["confirmed"] = [len(row) < 9 or row[8] == "1" for row in rows]
         df["turnover"] = df["volume"]
         df = df.astype({
             "open_time": "int64", "open": "float64", "high": "float64",
@@ -175,6 +181,12 @@ class OKXClient:
 
         result = pd.concat(all_frames, ignore_index=True)
         result = result.drop_duplicates(subset="open_time").sort_values("open_time").reset_index(drop=True)
+        # CLOSED candles only. Before this (fixed 2026-09-29) the still-forming
+        # candle leaked through as the last row: paper_trading/engine.py judged
+        # entries on a partial bar (then has_signal_for_candle locked that
+        # decision in for the whole 4h), and save_candles() permanently stored
+        # it with partial OHLC (it skips open_times already stored).
+        result = result[result["confirmed"]].drop(columns="confirmed").reset_index(drop=True)
         return result
 
     # -- Milestone 9 (deferred as a live feature -- see docs/ARCHITECTURE.md).
