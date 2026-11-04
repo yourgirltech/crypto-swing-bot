@@ -10,8 +10,10 @@ Each server gets its OWN visible console window, on purpose:
   mode), so it needs an interactive console, not a hidden background job;
 - closing a window stops that server; .\stop.cmd stops all of them.
 
-Anything already running (port 8010/3000 listening, an engine process
-alive) is left alone rather than started twice, so re-running this is safe.
+Anything of THIS project already running is left alone rather than started
+twice, so re-running this is safe. Ports held by another project are never
+touched: the frontend moves to the next free port from 3000, and the backend
+stops with an error, because the frontend expects it on 8010.
 PIDs of the windows it opens go to .run\pids.json for stop.ps1.
 #>
 param([switch]$NoEngine)
@@ -21,6 +23,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $runDir = Join-Path $root ".run"
 New-Item -ItemType Directory -Force $runDir | Out-Null
 $pidFile = Join-Path $runDir "pids.json"
+$frontend = Join-Path $root "frontend"
 
 $python = Join-Path $root "venv\Scripts\python.exe"
 if (-not (Test-Path $python)) { $python = "python" }
@@ -32,6 +35,25 @@ function Test-PortListening([int]$port) {
 function Get-EngineProcess {
     Get-CimInstance Win32_Process -Filter "Name='python.exe'" |
         Where-Object { $_.CommandLine -like "*paper_trading.engine*" }
+}
+
+function Get-OwnBackendListening {
+    foreach ($c in @(Get-NetTCPConnection -LocalPort 8010 -State Listen -ErrorAction SilentlyContinue)) {
+        $p = Get-CimInstance Win32_Process -Filter "ProcessId=$($c.OwningProcess)"
+        if ($p -and $p.CommandLine -like "*uvicorn*api.main:app*") { return $true }
+    }
+    return $false
+}
+
+# This project's Next.js server has this project's frontend path in its command line.
+function Get-OwnFrontendPort {
+    $own = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" |
+        Where-Object { $_.CommandLine -like "*$frontend\*" } |
+        ForEach-Object { $_.ProcessId })
+    foreach ($c in @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue)) {
+        if ($own -contains $c.OwningProcess -and $c.LocalPort -ge 3000 -and $c.LocalPort -lt 3100) { return [int]$c.LocalPort }
+    }
+    return $null
 }
 
 function Start-Window([string]$title, [string]$workDir, [string]$command) {
@@ -61,20 +83,26 @@ if (Test-PortListening 5433) {
 
 # 2. Backend API (FastAPI). First start can take 1-2 min: imports are slow from the OneDrive folder.
 Write-Host "Backend (8010)..."
-if (Test-PortListening 8010) {
-    Write-Host "  already listening" -ForegroundColor DarkGray
+if (Get-OwnBackendListening) {
+    Write-Host "  already running" -ForegroundColor DarkGray
+} elseif (Test-PortListening 8010) {
+    throw "Port 8010 is held by another program. Free it and re-run; the frontend expects the backend on 8010."
 } else {
     $pids["backend"] = Start-Window "swingbot: backend :8010" $root "& '$python' -m uvicorn api.main:app --port 8010"
 }
 
 # 3. Frontend (Next.js dev server).
-Write-Host "Frontend (3000)..."
-$frontend = Join-Path $root "frontend"
-if (Test-PortListening 3000) {
-    Write-Host "  already listening" -ForegroundColor DarkGray
+$frontendPort = Get-OwnFrontendPort
+if ($frontendPort) {
+    Write-Host "Frontend ($frontendPort)..."
+    Write-Host "  already running" -ForegroundColor DarkGray
 } else {
+    $frontendPort = 3000
+    while (Test-PortListening $frontendPort) { $frontendPort++ }
+    Write-Host "Frontend ($frontendPort)..."
+    if ($frontendPort -ne 3000) { Write-Host "  port 3000 is used by another program, using $frontendPort" -ForegroundColor Yellow }
     $install = if (Test-Path (Join-Path $frontend "node_modules")) { "" } else { "npm install; " }
-    $pids["frontend"] = Start-Window "swingbot: frontend :3000" $frontend "${install}npm run dev"
+    $pids["frontend"] = Start-Window "swingbot: frontend :$frontendPort" $frontend "${install}npm run dev -- --port $frontendPort"
 }
 
 # 4. Paper trading engine -- continuous. The loop restarts it if the process
@@ -100,5 +128,5 @@ if (-not $NoEngine) {
 $pids | ConvertTo-Json | Set-Content -Encoding utf8 $pidFile
 
 Write-Host ""
-Write-Host "Dashboard: http://localhost:3000   API docs: http://localhost:8010/docs"
+Write-Host "Dashboard: http://localhost:$frontendPort   API docs: http://localhost:8010/docs"
 Write-Host "Stop everything: .\stop.cmd"

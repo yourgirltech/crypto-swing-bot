@@ -75,7 +75,8 @@ proposal waits in that window until you answer it. Anything already
 running is left alone, so re-running `start.cmd` is safe. The backend's
 first start can take 1-2 minutes (slow imports from the OneDrive folder).
 
-- Dashboard: http://localhost:3000
+- Dashboard: http://localhost:3000 (if another program holds 3000, `start.cmd`
+  uses the next free port and prints the URL; `stop.cmd` only stops this project)
 - API docs: http://localhost:8010/docs
 
 Other entry points:

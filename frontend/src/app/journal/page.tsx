@@ -135,7 +135,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
                     <HumanDecisionStamp decision={e.human_decision} />
                   </td>
                   <td>
-                    <OutcomeStamp outcome={e.outcome} />
+                    <OutcomeStamp outcome={e.outcome} hasTrade={e.paper_trade_id != null} />
                   </td>
                   <td
                     className={`text-right ${

@@ -37,7 +37,15 @@ export function HumanDecisionStamp({ decision }: { decision: "approved" | "decli
   return <Stamp label="AWAITING" tone="muted" />;
 }
 
-export function OutcomeStamp({ outcome }: { outcome: "win" | "loss" | null }) {
+export function OutcomeStamp({
+  outcome,
+  hasTrade,
+}: {
+  outcome: "win" | "loss" | null;
+  hasTrade: boolean;
+}) {
+  // A signal that never became a paper trade has no outcome; it is not an open position.
+  if (!hasTrade) return <span className="text-muted">—</span>;
   if (outcome === "win") return <Stamp label="WIN" tone="green" />;
   if (outcome === "loss") return <Stamp label="LOSS" tone="red" />;
   return <Stamp label="OPEN" tone="amber" />;

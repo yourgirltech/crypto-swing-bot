@@ -57,7 +57,7 @@ export default async function OrdersPage() {
                   <td className="text-muted">{formatNgn(o.exit_fee)}</td>
                   <td className="uppercase text-muted">{o.paper_trade_status}</td>
                   <td>
-                    <OutcomeStamp outcome={o.outcome} />
+                    <OutcomeStamp outcome={o.outcome} hasTrade={o.paper_trade_id != null} />
                   </td>
                   <td className={o.r_multiple_realistic == null ? "text-muted" : o.r_multiple_realistic >= 0 ? "text-green" : "text-red"}>
                     {formatR(o.r_multiple_realistic)}
