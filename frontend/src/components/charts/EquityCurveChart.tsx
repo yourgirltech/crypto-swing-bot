@@ -19,7 +19,7 @@ export function EquityCurveChart({ points }: { points: EquityPoint[] }) {
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+        <AreaChart data={data} margin={{ top: 8, right: 48, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id="equityFill" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor={tone} stopOpacity={0.25} />
@@ -53,7 +53,7 @@ export function EquityCurveChart({ points }: { points: EquityPoint[] }) {
             labelStyle={{ color: MUTED }}
             formatter={(value) => [formatNgn(Number(value)), "Equity"]}
           />
-          <Area type="stepAfter" dataKey="equity" stroke={tone} strokeWidth={1.5} fill="url(#equityFill)" />
+          <Area type="stepAfter" dataKey="equity" stroke={tone} strokeWidth={1.5} fill="url(#equityFill)" isAnimationActive={false} />
         </AreaChart>
       </ResponsiveContainer>
     </div>

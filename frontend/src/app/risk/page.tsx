@@ -92,7 +92,7 @@ export default async function RiskPage() {
                   <td>
                     <RiskStatusStamp status={e.risk_status} />
                   </td>
-                  <td className="text-muted">{e.risk_verdict_reason ?? "—"}</td>
+                  <td className="min-w-64 text-muted !whitespace-normal">{e.risk_verdict_reason ?? "—"}</td>
                 </tr>
               ))}
             </tbody>

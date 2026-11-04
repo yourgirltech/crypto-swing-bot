@@ -4,15 +4,16 @@ import { listJournalEntries } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 
 export default async function AiInsightsPage() {
-  const entries = await listJournalEntries({ limit: 1 });
-  const latest = entries[0];
+  const entries = await listJournalEntries({ limit: 50 });
+  // Most signals never reach the approval step, so prefer the newest one with a stored review.
+  const latest = entries.find((e) => e.approval_summary) ?? entries[0];
 
   return (
     <div className="flex flex-col gap-4">
       <Panel title="AI Insights — Full Trade Review">
         <p className="border-b border-border px-3 py-2 text-xs text-muted">
           Surfaces reporting/plain_language_summary.py&apos;s full trade review — the exact text a
-          human saw at the CLI approval step. This is a historical record, never a live decision.
+          human saw at the CLI approval step, for the most recent signal that has one. This is a historical record, never a live decision.
         </p>
 
         {!latest && <p className="p-4 text-sm text-muted">No signals have been generated yet.</p>}
@@ -24,7 +25,7 @@ export default async function AiInsightsPage() {
                 {latest.symbol} — {latest.setup_type}
               </span>
               <RiskStatusStamp status={latest.risk_status} />
-              <HumanDecisionStamp decision={latest.human_decision} />
+              <HumanDecisionStamp decision={latest.human_decision} riskStatus={latest.risk_status} />
               <span className="font-mono text-xs text-muted">
                 Generated {formatDateTime(latest.generated_at)} — historical, not a pending decision.
               </span>

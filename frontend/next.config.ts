@@ -12,6 +12,7 @@ const nextConfig: NextConfig = {
   // for that origin specifically. Allow 127.0.0.1 explicitly rather than
   // asking anyone to remember to always use "localhost".
   allowedDevOrigins: ["127.0.0.1"],
+  devIndicators: false,
 };
 
 export default nextConfig;

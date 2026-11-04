@@ -17,7 +17,10 @@ export default async function DashboardPage() {
     getCandles({ symbol: PRIMARY_SYMBOL, limit: 180 }),
   ]);
 
-  const latestSignal = recent[0];
+  // A signal older than the charted window would read as a current trade setup.
+  const newestSignal = recent.find((e) => e.symbol === PRIMARY_SYMBOL);
+  const latestSignal =
+    newestSignal && candles[0] && newestSignal.generated_at >= candles[0].open_time ? newestSignal : undefined;
 
   return (
     <div className="flex flex-col gap-4">
@@ -133,7 +136,7 @@ export default async function DashboardPage() {
                     <RiskStatusStamp status={e.risk_status} />
                   </td>
                   <td>
-                    <HumanDecisionStamp decision={e.human_decision} />
+                    <HumanDecisionStamp decision={e.human_decision} riskStatus={e.risk_status} />
                   </td>
                   <td>
                     <OutcomeStamp outcome={e.outcome} hasTrade={e.paper_trade_id != null} />

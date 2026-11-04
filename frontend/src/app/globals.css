@@ -7,6 +7,17 @@
  * a public site with varying viewer preferences.
  */
 :root {
+  color-scheme: dark;
+}
+
+/* JetBrains Mono's naira sign overflows its cell and collides with the digits. */
+@font-face {
+  font-family: "Naira Fallback";
+  src: local("Segoe UI"), local("Arial");
+  unicode-range: U+20A6;
+}
+
+:root {
   --color-base: #0a0e14;
   --color-surface: #12161d;
   --color-surface-hover: #171c25;
@@ -32,7 +43,7 @@
   --color-amber: var(--color-amber);
 
   --font-sans: var(--font-plex-sans);
-  --font-mono: var(--font-jetbrains-mono);
+  --font-mono: "Naira Fallback", var(--font-jetbrains-mono);
 
   --radius-sharp: 0px;
   --radius-control: 3px;
@@ -53,6 +64,7 @@ body {
 table.data-table {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+  font-size: 0.8125rem;
   border-collapse: collapse;
   width: 100%;
 }

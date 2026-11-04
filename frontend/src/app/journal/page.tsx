@@ -91,14 +91,13 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
           </p>
         )}
         <div className="overflow-x-auto">
-          <table className="data-table">
+          <table className="data-table [&_td]:!px-2 [&_th]:!px-2">
             <thead>
               <tr>
                 <th>Generated</th>
                 <th>Symbol</th>
-                <th>Setup</th>
+                <th>Setup / Regime</th>
                 <th>Dir</th>
-                <th>Regime</th>
                 <th>Entry</th>
                 <th>Stop</th>
                 <th>Target</th>
@@ -111,7 +110,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
             <tbody>
               {entries.length === 0 && (
                 <tr>
-                  <td colSpan={12} className="py-6 text-center text-muted">
+                  <td colSpan={11} className="py-6 text-center text-muted">
                     Nothing here.
                   </td>
                 </tr>
@@ -120,11 +119,13 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
                 <tr key={e.signal_id}>
                   <td>{formatDateTime(e.generated_at)}</td>
                   <td>{e.symbol}</td>
-                  <td>{e.setup_type}</td>
+                  <td>
+                    {e.setup_type}
+                    <div className="text-xs text-muted">{e.regime}</div>
+                  </td>
                   <td className={e.direction === "long" ? "text-green" : "text-red"}>
                     {e.direction.toUpperCase()}
                   </td>
-                  <td className="text-muted">{e.regime}</td>
                   <td>{e.entry_price.toFixed(2)}</td>
                   <td className="text-red">{e.stop_price.toFixed(2)}</td>
                   <td className="text-green">{e.target_price.toFixed(2)}</td>
@@ -132,7 +133,7 @@ export default async function JournalPage({ searchParams }: { searchParams: Sear
                     <RiskStatusStamp status={e.risk_status} />
                   </td>
                   <td>
-                    <HumanDecisionStamp decision={e.human_decision} />
+                    <HumanDecisionStamp decision={e.human_decision} riskStatus={e.risk_status} />
                   </td>
                   <td>
                     <OutcomeStamp outcome={e.outcome} hasTrade={e.paper_trade_id != null} />

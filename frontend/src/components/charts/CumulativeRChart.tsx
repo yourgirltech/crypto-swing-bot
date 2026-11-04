@@ -22,7 +22,7 @@ export function CumulativeRChart({ points }: { points: CumulativeRPoint[] }) {
   return (
     <div className="h-64 w-full">
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+        <LineChart data={data} margin={{ top: 8, right: 16, bottom: 12, left: 0 }}>
           <CartesianGrid stroke={BORDER} strokeDasharray="0" vertical={false} />
           <XAxis
             dataKey="index"
@@ -51,7 +51,7 @@ export function CumulativeRChart({ points }: { points: CumulativeRPoint[] }) {
             formatter={(value) => [formatR(Number(value), 2), "Cumulative R"]}
             labelFormatter={(_, payload) => (payload?.[0]?.payload ? payload[0].payload.timeLabel : "")}
           />
-          <Line type="linear" dataKey="cumulative_r" stroke={GREEN} strokeWidth={1.5} dot={false} />
+          <Line type="linear" dataKey="cumulative_r" stroke={GREEN} strokeWidth={1.5} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>

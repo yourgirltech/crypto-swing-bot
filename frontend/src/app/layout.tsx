@@ -6,13 +6,13 @@ import { TickerBar } from "@/components/TickerBar";
 
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"], // latin-ext carries the naira sign
   weight: ["400", "500", "600"],
 });
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
+  subsets: ["latin", "latin-ext"], // latin-ext carries the naira sign
   weight: ["400", "500", "600"],
 });
 

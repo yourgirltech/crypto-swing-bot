@@ -31,7 +31,15 @@ export function RiskStatusStamp({ status }: { status: "pending" | "approved" | "
   return <Stamp label="PENDING" tone="amber" />;
 }
 
-export function HumanDecisionStamp({ decision }: { decision: "approved" | "declined" | null }) {
+export function HumanDecisionStamp({
+  decision,
+  riskStatus,
+}: {
+  decision: "approved" | "declined" | null;
+  riskStatus: "pending" | "approved" | "rejected";
+}) {
+  // The risk engine vetoed it, so it never reached a human.
+  if (riskStatus === "rejected" && decision === null) return <span className="text-muted">—</span>;
   if (decision === "approved") return <Stamp label="APPROVED" tone="green" />;
   if (decision === "declined") return <Stamp label="DECLINED" tone="red" />;
   return <Stamp label="AWAITING" tone="muted" />;

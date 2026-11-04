@@ -85,7 +85,7 @@ export function PriceChart({ candles, markers }: { candles: Candle[]; markers?: 
         something to render before/without the observer ever firing.
       */}
       <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={320}>
-        <ComposedChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+        <ComposedChart data={data} margin={{ top: 8, right: 48, bottom: 0, left: 0 }}>
           <CartesianGrid stroke={BORDER} strokeDasharray="0" vertical={false} />
           <XAxis
             dataKey="timeLabel"
